@@ -17,3 +17,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# サンプル出力ファイル（ローカル参照用）
+output/
