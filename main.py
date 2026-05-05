@@ -2,25 +2,34 @@
 Daily Intelligence — LINE報告自動化ツール + GitHub Pages
 
 設計方針：
-  カテゴリごとに独立した web_search を実行する（4回）。
-  1回の検索で全カテゴリをカバーしようとすると AI/Tech に偏るため、
-  各カテゴリを個別に検索することで全4カテゴリのカバーを保証する。
+  ニュース取得を RSS フィード（無料）に切り替え、OpenAI はテキスト要約のみに使う。
+  web_search ツールを廃止することでランニングコストを月 $3〜10 → 約 $0.20 に削減する。
 
 フロー：
-  1. fetch_news()   → 4回 responses.create (web_search) → 各カテゴリのテキスト収集
-                    → 1回 chat.completions (json_object) → 有効な JSON に変換
-  2. generate_html() → JSON から HTML を生成（記事URL をクリッカブルリンクに）
-  3. save_html()    → docs/index.html に保存
-  4. send_to_line() → GitHub Pages の URL を LINE に送信
+  1. fetch_category_rss()  → feedparser で RSS を取得（外部API費用ゼロ）
+  2. summarize_category()  → chat.completions (json_object) で要約・訳・語彙を生成
+  3. generate_html()       → JSON から HTML を生成（記事URL はクリッカブルリンク）
+  4. save_html()           → docs/index.html に保存
+  5. send_to_line()        → GitHub Pages の URL を LINE に送信
+
+コスト試算（月30日）:
+  RSS 取得       : $0.00（HTTP リクエスト）
+  OpenAI トークン: ~$0.005/回 × 30日 ≒ $0.15/月
+  LINE API       : 無料枠内（200通/月）
+  GitHub Actions : 公開リポジトリ無料
+  合計           : 約 $0.15〜$0.20/月
 """
 
 import html as _html
 import json
 import os
+import re
+import socket
 import sys
 from datetime import datetime
 from pathlib import Path
 
+import feedparser
 import pytz
 from openai import OpenAI
 from linebot.v3.messaging import (
@@ -30,6 +39,9 @@ from linebot.v3.messaging import (
     PushMessageRequest,
     TextMessage,
 )
+
+# feedparser の HTTP タイムアウト（秒）
+socket.setdefaulttimeout(15)
 
 # ── 定数 ──────────────────────────────────────────────────────────────────────
 
@@ -46,8 +58,16 @@ CATEGORIES_CONFIG = [
         "gradient": "from-blue-600 to-cyan-500",
         "color": "blue",
         "header_text": "blue-100",
-        "search_ja": "AI・人工知能・機械学習",
-        "sources_ja": "ITmedia AI+、日経クロステック、Impress Watch、ZDNet Japan、CNET Japan",
+        # RSS
+        "rss_feeds": [
+            "https://rss.itmedia.co.jp/rss/2.0/aiplus.xml",       # ITmedia AI+
+            "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml",  # ITmedia（フォールバック）
+        ],
+        "prefer_keywords": [
+            "AI", "人工知能", "機械学習", "生成AI", "LLM",
+            "GPT", "Claude", "Gemini", "ChatGPT", "深層学習",
+        ],
+        "summary_focus": "AI and machine learning: model releases, research breakthroughs, and real-world applications",
         "disclaimer": "",
     },
     {
@@ -58,8 +78,16 @@ CATEGORIES_CONFIG = [
         "gradient": "from-purple-600 to-violet-500",
         "color": "purple",
         "header_text": "purple-100",
-        "search_ja": "テクノロジー・IT・半導体・スタートアップ（AI以外）",
-        "sources_ja": "ITmedia、ASCII.jp、CNET Japan、BCN+R、マイナビニュース",
+        # RSS
+        "rss_feeds": [
+            "https://ascii.jp/rss.xml",                            # ASCII.jp
+            "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml",  # ITmedia
+        ],
+        "prefer_keywords": [
+            "スマートフォン", "半導体", "ゲーム", "PC", "クラウド",
+            "セキュリティ", "スタートアップ", "ロボット", "EV", "量子",
+        ],
+        "summary_focus": "technology excluding AI: hardware, software, semiconductors, and startups",
         "disclaimer": "",
     },
     {
@@ -70,8 +98,16 @@ CATEGORIES_CONFIG = [
         "gradient": "from-emerald-600 to-teal-500",
         "color": "emerald",
         "header_text": "emerald-100",
-        "search_ja": "国際政治・経済・外交・地政学",
-        "sources_ja": "NHK News Web、朝日新聞デジタル、日本経済新聞、TBS NEWS DIG、毎日新聞",
+        # RSS
+        "rss_feeds": [
+            "https://www3.nhk.or.jp/rss/news/cat0.xml",  # NHK 総合ニュース
+        ],
+        "prefer_keywords": [
+            "国際", "外交", "経済", "貿易", "関税", "制裁",
+            "米国", "中国", "EU", "ロシア", "G7", "G20",
+            "大統領", "首相", "外相", "サミット",
+        ],
+        "summary_focus": "world politics and international economics: diplomacy, trade, geopolitics",
         "disclaimer": "",
     },
     {
@@ -82,67 +118,18 @@ CATEGORIES_CONFIG = [
         "gradient": "from-amber-500 to-orange-500",
         "color": "amber",
         "header_text": "amber-100",
-        "search_ja": "航空券セール・新路線・マイル・旅行",
-        "primary_source": "TRAICY（https://www.traicy.com/）",
-        "sources_ja": "TRAICY (traicy.com)、トラベルボイス、ANA公式、JAL公式、マイナビトラベル",
+        # RSS（TRAICY をメインに使用）
+        "rss_feeds": [
+            "https://www.traicy.com/feed",  # TRAICY（メイン）
+        ],
+        "prefer_keywords": [
+            "セール", "特別運賃", "LCC", "割引", "キャンペーン",
+            "JAL", "ANA", "ジェットスター", "ピーチ", "新路線",
+        ],
+        "summary_focus": "airline deals, flight sales, and travel news relevant to Japan",
         "disclaimer": "※情報の正確性は各社公式サイトでご確認ください",
     },
 ]
-
-# ── プロンプト ─────────────────────────────────────────────────────────────────
-
-def _build_search_instructions(cfg: dict) -> str:
-    """カテゴリ別の web_search 指示プロンプトを生成する。"""
-    disclaimer_line = (
-        f"\n- Japanese summary must end with the sentence: 「{cfg['disclaimer']}」"
-        if cfg["disclaimer"] else ""
-    )
-    primary_source_line = (
-        f"\n- PRIMARY source to search first: {cfg['primary_source']}"
-        if cfg.get("primary_source") else ""
-    )
-    return f"""\
-You are a Japanese news analyst. Search ONLY Japanese news websites and report \
-today's latest news about {cfg['search_ja']} ({cfg['name']}).
-
-Rules:
-- Sources MUST be Japanese websites only. Good examples: {cfg['sources_ja']}{primary_source_line}
-- Find between 1 and 3 articles (use however many genuinely exist today; max 3)
-- For each article: full Japanese or English title as published, source name, and full URL
-- Write an English summary of approximately 200 words covering the articles found
-- Write a natural Japanese translation of the summary (~200字)
-- Select 4 TOEIC B1+ level English words from your English summary;
-  for each word provide part of speech (n./v./adj./adv.) and Japanese meaning{disclaimer_line}
-
-Format your response as clear plain text; include the exact article URL on its own line \
-after each article title."""
-
-
-FORMAT_INSTRUCTIONS = """\
-Convert the categorized news report below into valid JSON.
-Extract titles, sources, URLs, summaries, and vocabulary exactly as written.
-Output ONLY the JSON object — no markdown fences, no other text.
-
-Schema (articles array may have 1–3 items; all 4 categories must be present):
-{
-  "categories": [
-    {
-      "id": "<ai|tech|world|flights>",
-      "articles": [
-        {"title": "...", "source": "...", "url": "https://..."}
-      ],
-      "summary_en": "...",
-      "summary_ja": "...",
-      "vocabulary": [
-        {"word": "...", "pos": "n.", "meaning_ja": "..."}
-      ]
-    }
-  ]
-}
-
-Category IDs must be (in this order): "ai", "tech", "world", "flights"
-If an article URL is not clearly stated, use the source's homepage URL instead of "#".
-"""
 
 
 # ── ユーティリティ ─────────────────────────────────────────────────────────────
@@ -163,60 +150,155 @@ def truncate(text: str, max_chars: int = MAX_CHARS) -> str:
     return text[:max_chars - 10] + "\n...(省略)"
 
 
-# ── ニュース取得 ───────────────────────────────────────────────────────────────
+def _strip_html(text: str) -> str:
+    """RSS エントリの description などに含まれる HTML タグを除去する。"""
+    text = _html.unescape(text or "")
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
-def fetch_news(client: OpenAI) -> dict:
+
+# ── RSS 取得 ───────────────────────────────────────────────────────────────────
+
+def fetch_category_rss(cfg: dict) -> list[dict]:
     """
-    カテゴリごとに個別の web_search を実行し（4回）、
-    json_object モードで有効な JSON に変換して返す。
+    カテゴリの RSS フィードから記事を取得する（外部 API 費用ゼロ）。
+    複数フィードをフェッチし、prefer_keywords でスコアリングして上位を返す。
     """
-    jst = pytz.timezone("Asia/Tokyo")
-    today = datetime.now(jst).strftime("%Y-%m-%d")
+    all_entries: list[dict] = []
 
-    # ── Step 1: カテゴリごとに個別検索 ─────────────────────────────────────
-    category_texts: list[str] = []
-    for cfg in CATEGORIES_CONFIG:
-        print(f"  Searching [{cfg['id']}] {cfg['name']}...")
-        resp = client.responses.create(
-            model="gpt-4.1-mini",
-            tools=[{"type": "web_search"}],
-            instructions=_build_search_instructions(cfg),
-            input=(
-                f"Today is {today}. Search Japanese news sites and report the latest "
-                f"{cfg['search_ja']} news."
-            ),
-        )
-        text = resp.output_text
-        category_texts.append(
-            f"=== CATEGORY id={cfg['id']} : {cfg['name']} ===\n{text}"
-        )
-        print(f"  Done [{cfg['id']}]: {len(text)} chars")
+    for feed_url in cfg["rss_feeds"]:
+        try:
+            feed = feedparser.parse(
+                feed_url,
+                agent="DailyIntelligence/1.0 (+https://github.com/sakuuuuuuuu/daily-report)",
+            )
+            source_name = feed.feed.get("title", cfg["name"])
 
-    combined_text = "\n\n".join(category_texts)
+            for entry in feed.entries[:20]:  # 最新20件を候補にする
+                title = _strip_html(entry.get("title", ""))
+                desc  = _strip_html(
+                    entry.get("summary") or entry.get("description") or ""
+                )[:500]
+                url = entry.get("link", "")
 
-    # ── Step 2: json_object モードで JSON に変換（必ず有効な JSON を返す） ──
-    print("Step 2: Formatting into JSON...")
-    fmt_resp = client.chat.completions.create(
+                if title and url:
+                    all_entries.append({
+                        "title":       title,
+                        "source":      source_name,
+                        "url":         url,
+                        "description": desc,
+                    })
+
+        except Exception as e:
+            print(f"  [WARN] RSS fetch failed [{feed_url}]: {e}")
+
+    if not all_entries:
+        return []
+
+    # prefer_keywords でスコアリング（マッチ数が多い順）
+    keywords = [kw.lower() for kw in cfg.get("prefer_keywords", [])]
+    if keywords:
+        def score(art: dict) -> int:
+            haystack = (art["title"] + " " + art["description"]).lower()
+            return sum(1 for kw in keywords if kw in haystack)
+        all_entries.sort(key=score, reverse=True)
+
+    # 重複 URL を除去
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for entry in all_entries:
+        if entry["url"] not in seen:
+            seen.add(entry["url"])
+            unique.append(entry)
+
+    return unique[:3]  # 最大3件
+
+
+# ── OpenAI 要約 ────────────────────────────────────────────────────────────────
+
+def summarize_category(client: OpenAI, articles: list[dict], cfg: dict) -> dict:
+    """
+    RSS から取得した記事テキストを OpenAI で要約する。
+    web_search を使わず chat.completions のみ → トークン代のみ（月 ~$0.15 相当）。
+    """
+    if not articles:
+        return {
+            "summary_en": "No articles were found for this category today.",
+            "summary_ja": "本日はこのカテゴリの記事が見つかりませんでした。",
+            "vocabulary": [],
+        }
+
+    disclaimer_note = (
+        f'\n- End summary_ja with this sentence: 「{cfg["disclaimer"]}」'
+        if cfg.get("disclaimer") else ""
+    )
+
+    system_prompt = f"""\
+You are a bilingual Japanese/English news analyst.
+Summarize the {cfg['name']} ({cfg['summary_focus']}) articles below.{disclaimer_note}
+
+Return ONLY a valid JSON object (no markdown fences, no other text):
+{{
+  "summary_en": "Approximately 200-word English summary covering all articles",
+  "summary_ja": "Natural Japanese translation of summary_en (~200字)",
+  "vocabulary": [
+    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味"}},
+    {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味"}},
+    {{"word": "English word", "pos": "adj.", "meaning_ja": "日本語の意味"}},
+    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味"}}
+  ]
+}}
+vocabulary: 4 TOEIC B1+ level English words chosen from summary_en."""
+
+    articles_text = "\n\n".join(
+        f"[{i}] {art['title']}\nSource: {art['source']}\nURL: {art['url']}\n{art['description']}"
+        for i, art in enumerate(articles, 1)
+    )
+
+    resp = client.chat.completions.create(
         model="gpt-4.1-mini",
         response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": FORMAT_INSTRUCTIONS},
-            {"role": "user",   "content": combined_text},
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": articles_text},
         ],
-        max_tokens=4096,
+        max_tokens=1200,
     )
-    data = json.loads(fmt_resp.choices[0].message.content)
 
-    categories = data.get("categories", [])
-    if len(categories) != 4:
-        raise ValueError(
-            f"Expected 4 categories, got {len(categories)}. "
-            f"Raw (first 200 chars): {fmt_resp.choices[0].message.content[:200]}"
-        )
+    return json.loads(resp.choices[0].message.content)
 
-    cat_ids = [c.get("id") for c in categories]
-    print(f"Step 2 done: {cat_ids}")
-    return data
+
+# ── ニュース取得（統合） ────────────────────────────────────────────────────────
+
+def fetch_news(client: OpenAI) -> dict:
+    """
+    全カテゴリの RSS を取得し、OpenAI で要約して dict を返す。
+    """
+    categories = []
+    for cfg in CATEGORIES_CONFIG:
+        print(f"  [{cfg['id']}] RSS 取得中...")
+        articles = fetch_category_rss(cfg)
+        print(f"  [{cfg['id']}] {len(articles)} 件取得 → 要約中...")
+
+        summary = summarize_category(client, articles, cfg)
+
+        # description は HTML 生成に不要なので article から除去して格納
+        clean_articles = [
+            {"title": a["title"], "source": a["source"], "url": a["url"]}
+            for a in articles
+        ]
+
+        categories.append({
+            "id":         cfg["id"],
+            "articles":   clean_articles,
+            "summary_en": summary.get("summary_en", ""),
+            "summary_ja": summary.get("summary_ja", ""),
+            "vocabulary": summary.get("vocabulary", []),
+        })
+        print(f"  [{cfg['id']}] 完了")
+
+    return {"categories": categories}
 
 
 # ── HTML生成 ───────────────────────────────────────────────────────────────────
@@ -226,12 +308,12 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
     esc = _html.escape
     c = cfg["color"]
 
-    articles  = cat_data.get("articles", [])
+    articles   = cat_data.get("articles", [])
     summary_en = cat_data.get("summary_en", "")
     summary_ja = cat_data.get("summary_ja", "")
     vocabulary = cat_data.get("vocabulary", [])
 
-    # ── 記事リスト（最大3件） ────────────────────────────────────────────────
+    # 記事リスト（最大3件、URLはクリッカブルリンク）
     articles_html = ""
     for i, art in enumerate(articles[:3], 1):
         url    = art.get("url") or "#"
@@ -253,7 +335,6 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
             <span class="text-slate-300 group-hover:text-{c}-400 text-lg mt-0.5 shrink-0 transition-colors">›</span>
           </a>"""
 
-    # ── サマリー ─────────────────────────────────────────────────────────────
     en_paras = "".join(
         f'<p class="text-sm text-slate-700 leading-relaxed mt-3">{esc(p)}</p>'
         for p in summary_en.split("\n") if p.strip()
@@ -263,7 +344,6 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
         for p in summary_ja.split("\n") if p.strip()
     )
 
-    # ── ボキャブラリー accordion ─────────────────────────────────────────────
     vocab_rows = "".join(
         f"""
               <div class="flex items-center gap-2 px-4 py-3 border-b border-{c}-100 last:border-b-0 bg-white">
