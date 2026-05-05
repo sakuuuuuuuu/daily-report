@@ -1,10 +1,19 @@
 """
 Daily Intelligence — LINE報告自動化ツール + GitHub Pages
-毎朝7時（JST）に最新ニュースを収集・要約して
-HTMLレポートをGitHub Pagesに公開し、URLをLINEに送信する。
+
+設計方針：
+  OpenAI に JSON を返させることで、テキスト正規表現パースの脆弱性を排除する。
+  JSON スキーマに url フィールドを含め、実際の記事リンクを HTML に埋め込む。
+
+フロー：
+  1. fetch_news()  → OpenAI (web_search) → JSON を取得・パース
+  2. generate_html() → JSON から sample_report.v4.html 相当の HTML を生成
+  3. save_html()   → docs/index.html に保存（GitHub Actions が後続でコミット）
+  4. send_to_line() → GitHub Pages の URL を LINE に送信
 """
 
 import html as _html
+import json
 import os
 import re
 import sys
@@ -27,6 +36,7 @@ GITHUB_PAGES_URL = "https://sakuuuuuuuu.github.io/daily-report/"
 HTML_OUTPUT_PATH = Path("docs/index.html")
 MAX_CHARS = 4000
 
+# カテゴリ設定（表示順・スタイル・IDの正規定義）
 CATEGORIES_CONFIG = [
     {
         "id": "ai",
@@ -66,39 +76,52 @@ CATEGORIES_CONFIG = [
     },
 ]
 
-INSTRUCTIONS = """You are a professional news analyst. Search the web and report today's latest news
-for ALL FOUR of the following categories. For each category, provide exactly 3 articles
-and a ~200-word English summary followed by its Japanese translation and 4 vocabulary words.
+# ── OpenAI プロンプト（JSON 形式で返すよう指示） ────────────────────────────────
 
-Output MUST follow this exact plain-text format for each category:
+INSTRUCTIONS = """\
+You are a professional news analyst with web search capability.
 
-[CATEGORY_TAG]
-[絵文字] [カテゴリ名]
-━━━━━━━━━━━━━━━━━━━━
-① [記事タイトル]（[ソース名]）
-② [記事タイトル]（[ソース名]）
-③ [記事タイトル]（[ソース名]）
+Search today's web for the latest news and return ONLY a JSON object — no markdown,
+no code fences, no explanation, just the raw JSON.
 
-📝 Summary
-[英語200語前後の要約]
+Required JSON schema (follow exactly):
+{
+  "categories": [
+    {
+      "id": "<category-id>",
+      "articles": [
+        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"},
+        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"},
+        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"}
+      ],
+      "summary_en": "<~200-word English summary>",
+      "summary_ja": "<natural Japanese translation of summary_en>",
+      "vocabulary": [
+        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
+        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
+        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
+        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"}
+      ]
+    }
+  ]
+}
 
-🇯🇵 まとめ
-[上記の自然な日本語訳]
+The "categories" array MUST contain EXACTLY these 4 objects in this order:
+  1. id "ai"      — AI & Machine Learning (latest AI model releases, research, applications)
+  2. id "tech"    — Technology (hardware, software, startups — excluding AI)
+  3. id "world"   — World Politics & Economy (geopolitics, international economics, diplomacy)
+  4. id "flights" — Airline Deals & Travel (sales, new routes, travel news relevant to Japan)
 
-📖 Vocabulary
-・[英単語] [品詞] [日本語の意味]
-・[英単語] [品詞] [日本語の意味]
-・[英単語] [品詞] [日本語の意味]
-・[英単語] [品詞] [日本語の意味]
-[END_CATEGORY]
-
-The four categories are:
-1. 🤖 AI & Machine Learning
-2. 💻 Technology
-3. 🌍 World Politics & Economy
-4. ✈️ Airline Deals & Travel（このカテゴリのみ、[END_CATEGORY]の直前に「※情報の正確性は各社公式サイトでご確認ください」を追加すること）
-
-Output all four categories in order, with no additional commentary outside the tags."""
+Strict rules:
+- Each category must have exactly 3 articles.
+- Every "url" must be a real, working HTTPS URL discovered via your web search.
+- summary_en: approximately 200 words covering all 3 articles.
+- summary_ja: natural Japanese translation of summary_en.
+- vocabulary: exactly 4 TOEIC B1+ level English words chosen from summary_en.
+- For id "flights" only: append the sentence \
+"※情報の正確性は各社公式サイトでご確認ください" at the end of summary_ja.
+- Output ONLY the JSON object. No other text whatsoever.\
+"""
 
 
 # ── ユーティリティ ─────────────────────────────────────────────────────────────
@@ -122,8 +145,29 @@ def truncate(text: str, max_chars: int = MAX_CHARS) -> str:
 
 # ── ニュース取得 ───────────────────────────────────────────────────────────────
 
-def fetch_news(client: OpenAI) -> str:
-    """OpenAI Responses API + web_search で4カテゴリのニュースを一括取得する。"""
+def _extract_json(text: str) -> dict:
+    """
+    OpenAI の出力テキストから JSON オブジェクトを抽出してパースする。
+    マークダウンコードブロックで囲まれていても正しく処理する。
+    """
+    # コードフェンスを除去
+    cleaned = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+
+    # 最初の { から最後の } の範囲を取り出す
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError("JSON object not found in OpenAI response")
+
+    return json.loads(cleaned[start : end + 1])
+
+
+def fetch_news(client: OpenAI) -> dict:
+    """
+    OpenAI Responses API + web_search で4カテゴリのニュースを取得し、
+    パース済みの dict を返す。
+    """
     jst = pytz.timezone("Asia/Tokyo")
     today = datetime.now(jst).strftime("%Y-%m-%d")
 
@@ -132,134 +176,88 @@ def fetch_news(client: OpenAI) -> str:
         tools=[{"type": "web_search"}],
         instructions=INSTRUCTIONS,
         input=(
-            "Search for today's latest news in all four categories: "
-            "AI & Machine Learning, Technology, World Politics & Economy, "
-            f"and Airline Deals & Travel (Japan routes focus). Today's date: {today}"
+            "Search today's web for the latest news in all four categories "
+            "(AI & Machine Learning, Technology, World Politics & Economy, "
+            f"Airline Deals & Travel). Today's date: {today}. "
+            "Return only the JSON as instructed."
         ),
     )
-    return response.output_text
 
+    raw = response.output_text
+    data = _extract_json(raw)
 
-# ── テキスト分割 ───────────────────────────────────────────────────────────────
+    # 最低限のスキーマ検証
+    categories = data.get("categories", [])
+    if len(categories) != 4:
+        raise ValueError(
+            f"Expected 4 categories in JSON, got {len(categories)}. "
+            f"Raw output (first 200 chars): {raw[:200]}"
+        )
 
-def split_categories(raw_text: str) -> list[str] | None:
-    """
-    [CATEGORY_TAG]～[END_CATEGORY] タグでテキストを4カテゴリに分割する。
-    分割に失敗した場合はNoneを返す。
-    """
-    matches = re.findall(r"\[CATEGORY_TAG\](.*?)\[END_CATEGORY\]", raw_text, re.DOTALL)
-    if len(matches) == 4:
-        return [m.strip() for m in matches]
-    print(f"WARNING: カテゴリ分割失敗 (見つかったタグ数: {len(matches)})")
-    return None
+    return data
 
 
 # ── HTML生成 ───────────────────────────────────────────────────────────────────
 
-def _parse_category_text(text: str) -> dict:
-    """カテゴリテキストブロックを構造化辞書にパースする。"""
-    articles: list[dict] = []
-    summary_en_lines: list[str] = []
-    summary_ja_lines: list[str] = []
-    vocab_items: list[dict] = []
-    current_section: str | None = None
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        if "━━━" in line:
-            current_section = "articles"
-            continue
-        if re.search(r"📝\s*Summary", line):
-            current_section = "summary_en"
-            continue
-        if "🇯🇵" in line and "まとめ" in line:
-            current_section = "summary_ja"
-            continue
-        if re.search(r"📖\s*Vocabulary", line):
-            current_section = "vocab"
-            continue
-
-        if current_section == "articles":
-            m = re.match(r"^[①②③]\s+(.+?)（(.+?)）\s*$", line)
-            if m:
-                articles.append({"title": m.group(1), "source": m.group(2)})
-            elif re.match(r"^[①②③]", line):
-                title = re.sub(r"^[①②③]\s*", "", line)
-                articles.append({"title": title, "source": ""})
-
-        elif current_section == "summary_en":
-            summary_en_lines.append(line)
-
-        elif current_section == "summary_ja":
-            summary_ja_lines.append(line)
-
-        elif current_section == "vocab":
-            m = re.match(
-                r"^・?(\S+)\s+(\[[^\]]+\]|\([^)]+\)|[a-z]+\.)\s+(.+)$", line
-            )
-            if m:
-                vocab_items.append(
-                    {"word": m.group(1), "pos": m.group(2), "meaning": m.group(3)}
-                )
-
-    return {
-        "articles": articles,
-        "summary_en": "\n".join(summary_en_lines),
-        "summary_ja": "\n".join(summary_ja_lines),
-        "vocabulary": vocab_items,
-    }
-
-
-def _category_section_html(text: str, cfg: dict) -> str:
-    """1カテゴリ分の <section> HTMLを生成する。"""
+def _category_section_html(cat_data: dict, cfg: dict) -> str:
+    """JSON の1カテゴリ分のデータから <section> HTML を生成する。"""
     esc = _html.escape
-    parsed = _parse_category_text(text)
     c = cfg["color"]
     grad = cfg["gradient"]
 
-    # ── 記事リスト ──
+    articles = cat_data.get("articles", [])
+    summary_en = cat_data.get("summary_en", "")
+    summary_ja = cat_data.get("summary_ja", "")
+    vocabulary = cat_data.get("vocabulary", [])
+
+    # ── 記事リスト（URLをクリッカブルリンクに） ──
     articles_html = ""
-    for i, art in enumerate(parsed["articles"], 1):
+    for i, art in enumerate(articles[:3], 1):
+        url = art.get("url", "#") or "#"
+        title = art.get("title", "（タイトル不明）")
+        source = art.get("source", "")
+
         source_badge = (
             f'<span class="text-xs text-{c}-700 bg-{c}-50 border border-{c}-100 '
-            f'px-2 py-0.5 rounded-full font-medium leading-none mt-1.5 inline-block">'
-            f'{esc(art["source"])}</span>'
-            if art["source"] else ""
-        )
+            f"px-2 py-0.5 rounded-full font-medium leading-none mt-1.5 inline-block\">"
+            f"{esc(source)}</span>"
+        ) if source else ""
+
         articles_html += f"""
-          <div class="article-link flex items-start gap-3 px-4 py-4 border-b border-slate-100 hover:bg-{c}-50 group">
+          <a href="{esc(url)}" target="_blank" rel="noopener noreferrer"
+             class="article-link flex items-start gap-3 px-4 py-4 border-b border-slate-100 hover:bg-{c}-50 group">
             <span class="flex-none w-6 h-6 rounded-full bg-{c}-100 text-{c}-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i}</span>
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-slate-800 group-hover:text-{c}-600 transition-colors leading-snug line-clamp-2">{esc(art["title"])}</p>
+              <p class="text-sm font-semibold text-slate-800 group-hover:text-{c}-600 transition-colors leading-snug line-clamp-2">{esc(title)}</p>
               {source_badge}
             </div>
             <span class="text-slate-300 group-hover:text-{c}-400 text-lg mt-0.5 shrink-0 transition-colors">›</span>
-          </div>"""
+          </a>"""
 
-    # ── English Summary ──
+    # ── サマリー（英語） ──
     en_paras = "".join(
         f'<p class="text-sm text-slate-700 leading-relaxed mt-3">{esc(p)}</p>'
-        for p in parsed["summary_en"].split("\n") if p.strip()
+        for p in summary_en.split("\n")
+        if p.strip()
     )
 
-    # ── Japanese Summary ──
+    # ── サマリー（日本語） ──
     ja_paras = "".join(
         f'<p class="text-sm text-slate-700 leading-relaxed mt-3">{esc(p)}</p>'
-        for p in parsed["summary_ja"].split("\n") if p.strip()
+        for p in summary_ja.split("\n")
+        if p.strip()
     )
 
-    # ── Vocabulary accordion ──
-    vocab_rows = ""
-    for v in parsed["vocabulary"]:
-        vocab_rows += f"""
+    # ── ボキャブラリー accordion ──
+    vocab_rows = "".join(
+        f"""
               <div class="flex items-center gap-2 px-4 py-3 border-b border-{c}-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">{esc(v["word"])}</span>
-                <span class="text-xs font-semibold text-{c}-600 bg-{c}-50 border border-{c}-200 px-1.5 py-0.5 rounded">{esc(v["pos"])}</span>
-                <span class="text-xs text-slate-600">{esc(v["meaning"])}</span>
+                <span class="font-bold text-sm text-slate-800">{esc(v.get("word", ""))}</span>
+                <span class="text-xs font-semibold text-{c}-600 bg-{c}-50 border border-{c}-200 px-1.5 py-0.5 rounded">{esc(v.get("pos", ""))}</span>
+                <span class="text-xs text-slate-600">{esc(v.get("meaning_ja", ""))}</span>
               </div>"""
+        for v in vocabulary
+    )
 
     vocab_section = f"""
           <details class="mt-5 rounded-xl overflow-hidden border border-{c}-200">
@@ -275,8 +273,6 @@ def _category_section_html(text: str, cfg: dict) -> str:
             </div>
           </details>""" if vocab_rows else ""
 
-    article_count = len(parsed["articles"])
-
     return f"""
     <section id="{cfg['id']}" class="card">
       <div class="rounded-2xl overflow-hidden shadow-md">
@@ -290,7 +286,7 @@ def _category_section_html(text: str, cfg: dict) -> str:
                 <p class="text-{cfg['header_text']} text-xs mt-0.5">{esc(cfg['name_ja'])}</p>
               </div>
             </div>
-            <span class="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">{article_count} articles</span>
+            <span class="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">{len(articles[:3])} articles</span>
           </div>
         </div>
 
@@ -324,22 +320,30 @@ def _category_section_html(text: str, cfg: dict) -> str:
     </section>"""
 
 
-def generate_html(categories: list[str] | None, raw_text: str, date_str: str) -> str:
-    """HTMLレポートを生成する。categories が None の場合はフォールバック表示。"""
+def generate_html(news_data: dict | None, date_str: str) -> str:
+    """
+    JSON データから完全な HTML レポートを生成する。
+    news_data が None の場合はエラーページを返す。
+    """
     esc = _html.escape
 
-    if categories and len(categories) == 4:
+    if news_data:
+        # JSON の categories を id でインデックス化し、CATEGORIES_CONFIG の順で HTML を構築
+        cat_by_id = {c["id"]: c for c in news_data.get("categories", [])}
         sections_html = "\n".join(
-            _category_section_html(cat_text, cfg)
-            for cat_text, cfg in zip(categories, CATEGORIES_CONFIG)
+            _category_section_html(cat_by_id.get(cfg["id"], {}), cfg)
+            for cfg in CATEGORIES_CONFIG
         )
-        article_count = "12"
+        article_count = sum(
+            len(cat_by_id.get(cfg["id"], {}).get("articles", []))
+            for cfg in CATEGORIES_CONFIG
+        )
     else:
-        sections_html = f"""
-        <div class="bg-white rounded-2xl shadow-md p-6">
-          <pre class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">{esc(raw_text)}</pre>
+        sections_html = """
+        <div class="bg-white rounded-2xl shadow-md p-6 text-center">
+          <p class="text-slate-500 text-sm">本日のレポートの取得に失敗しました。しばらくしてから再度お試しください。</p>
         </div>"""
-        article_count = "—"
+        article_count = 0
 
     nav_tabs = "".join(
         f'<a href="#{cfg["id"]}" data-section="{cfg["id"]}"'
@@ -437,7 +441,6 @@ def generate_html(categories: list[str] | None, raw_text: str, date_str: str) ->
   </footer>
 
   <script>
-    // アクティブなナビタブをハイライト
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('section[id]');
     const observer = new IntersectionObserver(
@@ -446,9 +449,7 @@ def generate_html(categories: list[str] | None, raw_text: str, date_str: str) ->
           if (e.isIntersecting) {{
             tabs.forEach(t => {{
               const active = t.dataset.section === e.target.id;
-              t.classList.toggle('border-b-2', true);
               t.classList.toggle('font-semibold', active);
-              t.style.color = active ? '' : '';
             }});
           }}
         }});
@@ -508,30 +509,32 @@ def main() -> None:
     jst = pytz.timezone("Asia/Tokyo")
     now = datetime.now(jst)
     weekdays = ["月", "火", "水", "木", "金", "土", "日"]
-    date_str = f"{now.year}年{now.month}月{now.day}日（{weekdays[now.weekday()]}）{now.strftime('%H:%M')}"
+    date_str = (
+        f"{now.year}年{now.month}月{now.day}日"
+        f"（{weekdays[now.weekday()]}）"
+        f"{now.strftime('%H:%M')}"
+    )
 
-    # Step 1: ニュース取得
-    raw_text = ""
+    # Step 1: ニュースを JSON で取得
+    news_data: dict | None = None
     try:
-        raw_text = fetch_news(client)
-        print("SUCCESS: ニュース取得完了")
+        news_data = fetch_news(client)
+        cat_ids = [c["id"] for c in news_data.get("categories", [])]
+        print(f"SUCCESS: ニュース取得完了 — categories: {cat_ids}")
     except Exception as e:
         print(f"ERROR [fetch_news]: {safe_error(e)}")
 
-    # Step 2: カテゴリ分割
-    categories = split_categories(raw_text) if raw_text else None
-
-    # Step 3: HTML生成 → 保存
+    # Step 2: HTML 生成 → 保存
     try:
-        html_content = generate_html(categories, raw_text, date_str)
+        html_content = generate_html(news_data, date_str)
         save_html(html_content)
     except Exception as e:
         print(f"ERROR [generate_html]: {safe_error(e)}")
 
-    # Step 4: LINEにURL通知を送信
+    # Step 3: LINE に URL 通知を送信
     try:
         send_to_line([build_line_message(date_str)])
-        print("SUCCESS: LINE送信完了")
+        print("SUCCESS: LINE 送信完了")
     except Exception as e:
         print(f"ERROR [send_to_line]: {safe_error(e)}")
         sys.exit(1)
