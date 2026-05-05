@@ -138,6 +138,16 @@ CATEGORIES_CONFIG = [
 
 # ── ユーティリティ ─────────────────────────────────────────────────────────────
 
+def _write_github_output(key: str, value: str) -> None:
+    """GitHub Actions の GITHUB_OUTPUT ファイルに key=value を書き込む。
+    ローカル実行時は GITHUB_OUTPUT が未設定のため何もしない。
+    """
+    path = os.environ.get("GITHUB_OUTPUT", "")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"{key}={value}\n")
+
+
 def safe_error(e: Exception) -> str:
     """例外メッセージからAPIキー等の機密情報をマスクして返す。
 
@@ -648,11 +658,17 @@ def build_line_message(date_str: str) -> str:
 
 
 def send_to_line(messages: list[str]) -> None:
-    configuration = Configuration(access_token=os.environ["LINE_ACCESS_TOKEN"])
+    token = os.environ.get("LINE_ACCESS_TOKEN", "")
+    user_id = os.environ.get("LINE_USER_ID", "")
+    if not token or not user_id:
+        raise ValueError(
+            "LINE_ACCESS_TOKEN または LINE_USER_ID が GitHub Secrets に設定されていません。"
+        )
+    configuration = Configuration(access_token=token)
     text_messages = [TextMessage(type="text", text=truncate(msg)) for msg in messages]
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).push_message(
-            PushMessageRequest(to=os.environ["LINE_USER_ID"], messages=text_messages)
+            PushMessageRequest(to=user_id, messages=text_messages)
         )
 
 
@@ -692,14 +708,22 @@ def main() -> None:
         print("FATAL: HTML を保存できなかったためプッシュをスキップします")
         sys.exit(1)
 
+    # HTML 保存成功を GITHUB_OUTPUT に記録する。
+    # ワークフローの次ステップがこの値を見て git push の実行可否を判断する。
+    _write_github_output("html_saved", "true")
+
     # ── フェーズ3: LINE通知 ────────────────────────────────
-    # LINE失敗は exit(1) しない。プッシュ（GitHub Pages更新）を優先する。
+    # LINE失敗は exit(2) で終了する。
+    # ワークフロー側で continue-on-error: true を設定し、
+    # push は html_saved 出力を条件に独立して実行するため、
+    # LINE失敗でも GitHub Pages の更新はブロックされない。
     try:
         send_to_line([build_line_message(date_str)])
         print("SUCCESS: LINE 送信完了")
     except Exception as e:
         print(f"ERROR [send_to_line]: {safe_error(e)}")
-        print("WARNING: LINE 通知は失敗しましたが、HTML は GitHub Pages に公開されます")
+        print("FATAL: LINE 通知に失敗しました。ワークフローを失敗として記録します。")
+        sys.exit(2)
 
 
 if __name__ == "__main__":

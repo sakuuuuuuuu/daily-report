@@ -25,6 +25,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run daily report
+        id: run_report
+        # exit 0: 全成功  exit 1: HTML保存失敗  exit 2: HTML成功・LINE失敗
+        # continue-on-error により exit 2 でも後続ステップが実行される。
+        # html_saved=true が GITHUB_OUTPUT に書き込まれた場合のみ push を行う。
+        continue-on-error: true
         run: python main.py
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -32,12 +37,24 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
 
       - name: Commit and push HTML report
-        # LINE通知の失敗に関わらずプッシュを実行する。
-        # python main.py が exit(1) するのは HTML 保存失敗時のみなので、
-        # 保存成功 → LINE失敗 のケースでは exit(0) となりこのステップが実行される。
+        # HTML が正常に保存された場合のみ push する（html_saved 出力で判定）。
+        # LINE通知の成否（exit 0 / exit 2）は問わない。
+        if: steps.run_report.outputs.html_saved == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/index.html
           git diff --staged --quiet || git commit -m "Update daily report $(date -u +%Y-%m-%d)"
           git push
+
+      - name: Fail if report generation or LINE notification failed
+        # main.py が何らかの理由で失敗した場合、ワークフローを明示的に失敗させる。
+        # これにより GitHub がメール通知を送り、問題が不可視にならない。
+        if: steps.run_report.outcome == 'failure'
+        run: |
+          if [ "${{ steps.run_report.outputs.html_saved }}" = "true" ]; then
+            echo "::error title=LINE Notification Failed::LINE へのプッシュ通知に失敗しました。ワークフローログの ERROR [send_to_line] を確認してください。"
+          else
+            echo "::error title=Report Generation Failed::HTML の生成または保存に失敗しました。ワークフローログの ERROR を確認してください。"
+          fi
+          exit 1
