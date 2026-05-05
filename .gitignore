@@ -1,0 +1,19 @@
+# 環境変数ファイル（APIキー等を含む・絶対にコミットしない）
+.env
+*.env
+
+# Python
+*.pyc
+*.pyo
+__pycache__/
+*.py[cod]
+
+# ログ
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
