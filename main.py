@@ -2,20 +2,21 @@
 Daily Intelligence — LINE報告自動化ツール + GitHub Pages
 
 設計方針：
-  OpenAI に JSON を返させることで、テキスト正規表現パースの脆弱性を排除する。
-  JSON スキーマに url フィールドを含め、実際の記事リンクを HTML に埋め込む。
+  ニュース取得と JSON構造化 を 2ステップに分離する。
+    Step 1: responses.create + web_search → ニュースをテキストで取得（自由形式）
+    Step 2: chat.completions.create + json_object → テキストを有効なJSONに変換（保証付き）
+  これにより、web_search 結果に余分なテキストが混入しても JSON パースが壊れない。
 
 フロー：
-  1. fetch_news()  → OpenAI (web_search) → JSON を取得・パース
-  2. generate_html() → JSON から sample_report.v4.html 相当の HTML を生成
-  3. save_html()   → docs/index.html に保存（GitHub Actions が後続でコミット）
+  1. fetch_news()   → Step1 + Step2 で JSON dict を返す
+  2. generate_html() → JSON から HTML を生成（記事URL をクリッカブルリンクに）
+  3. save_html()    → docs/index.html に保存（GitHub Actions が後続でコミット）
   4. send_to_line() → GitHub Pages の URL を LINE に送信
 """
 
 import html as _html
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -36,7 +37,6 @@ GITHUB_PAGES_URL = "https://sakuuuuuuuu.github.io/daily-report/"
 HTML_OUTPUT_PATH = Path("docs/index.html")
 MAX_CHARS = 4000
 
-# カテゴリ設定（表示順・スタイル・IDの正規定義）
 CATEGORIES_CONFIG = [
     {
         "id": "ai",
@@ -76,51 +76,62 @@ CATEGORIES_CONFIG = [
     },
 ]
 
-# ── OpenAI プロンプト（JSON 形式で返すよう指示） ────────────────────────────────
+# ── Step 1 プロンプト：web_search でニュースを収集（テキスト形式） ──────────────
 
-INSTRUCTIONS = """\
-You are a professional news analyst with web search capability.
+SEARCH_INSTRUCTIONS = """\
+You are a professional news analyst. Use web search to find today's latest news
+and write a thorough report covering ALL FOUR categories below.
 
-Search today's web for the latest news and return ONLY a JSON object — no markdown,
-no code fences, no explanation, just the raw JSON.
+For each category, include:
+- Exactly 3 articles with title, source outlet name, and full URL
+- An English summary of approximately 200 words
+- A natural Japanese translation of the summary
+- 4 TOEIC B1+ level English vocabulary words from the summary,
+  with part of speech and Japanese meanings
 
-Required JSON schema (follow exactly):
+Categories:
+1. AI & Machine Learning  — latest AI model releases, research breakthroughs, applications
+2. Technology             — hardware, software, startups (excluding AI topics)
+3. World Politics & Economy — geopolitics, international trade, diplomacy, macroeconomics
+4. Airline Deals & Travel — flight sales, new routes, travel news relevant to Japan
+
+For category 4 only, end the Japanese summary with this disclaimer sentence:
+「※情報の正確性は各社公式サイトでご確認ください」
+"""
+
+# ── Step 2 プロンプト：テキストを JSON に変換（json_object モードで保証付き） ──
+
+FORMAT_INSTRUCTIONS = """\
+Convert the news report provided by the user into the following JSON structure.
+Preserve titles, sources, URLs, summaries, and vocabulary exactly as given.
+Output valid JSON only — no markdown fences, no explanation.
+
+Required schema:
 {
   "categories": [
     {
-      "id": "<category-id>",
+      "id": "ai",
       "articles": [
-        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"},
-        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"},
-        {"title": "<headline>", "source": "<outlet name>", "url": "<full https URL>"}
+        {"title": "...", "source": "...", "url": "https://..."},
+        {"title": "...", "source": "...", "url": "https://..."},
+        {"title": "...", "source": "...", "url": "https://..."}
       ],
-      "summary_en": "<~200-word English summary>",
-      "summary_ja": "<natural Japanese translation of summary_en>",
+      "summary_en": "~200-word English summary",
+      "summary_ja": "Japanese translation",
       "vocabulary": [
-        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
-        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
-        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"},
-        {"word": "<English word>", "pos": "<n.|v.|adj.|adv.>", "meaning_ja": "<日本語の意味>"}
+        {"word": "...", "pos": "n.", "meaning_ja": "..."},
+        {"word": "...", "pos": "v.", "meaning_ja": "..."},
+        {"word": "...", "pos": "adj.", "meaning_ja": "..."},
+        {"word": "...", "pos": "n.", "meaning_ja": "..."}
       ]
     }
   ]
 }
 
-The "categories" array MUST contain EXACTLY these 4 objects in this order:
-  1. id "ai"      — AI & Machine Learning (latest AI model releases, research, applications)
-  2. id "tech"    — Technology (hardware, software, startups — excluding AI)
-  3. id "world"   — World Politics & Economy (geopolitics, international economics, diplomacy)
-  4. id "flights" — Airline Deals & Travel (sales, new routes, travel news relevant to Japan)
+The categories array must have exactly 4 elements with these ids in order:
+  "ai", "tech", "world", "flights"
 
-Strict rules:
-- Each category must have exactly 3 articles.
-- Every "url" must be a real, working HTTPS URL discovered via your web search.
-- summary_en: approximately 200 words covering all 3 articles.
-- summary_ja: natural Japanese translation of summary_en.
-- vocabulary: exactly 4 TOEIC B1+ level English words chosen from summary_en.
-- For id "flights" only: append the sentence \
-"※情報の正確性は各社公式サイトでご確認ください" at the end of summary_ja.
-- Output ONLY the JSON object. No other text whatsoever.\
+If any URL is missing, use "#" as a placeholder.
 """
 
 
@@ -143,57 +154,57 @@ def truncate(text: str, max_chars: int = MAX_CHARS) -> str:
     return text[:max_chars - 10] + "\n...(省略)"
 
 
-# ── ニュース取得 ───────────────────────────────────────────────────────────────
-
-def _extract_json(text: str) -> dict:
-    """
-    OpenAI の出力テキストから JSON オブジェクトを抽出してパースする。
-    マークダウンコードブロックで囲まれていても正しく処理する。
-    """
-    # コードフェンスを除去
-    cleaned = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s*```$", "", cleaned)
-
-    # 最初の { から最後の } の範囲を取り出す
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("JSON object not found in OpenAI response")
-
-    return json.loads(cleaned[start : end + 1])
-
+# ── ニュース取得（2ステップ） ───────────────────────────────────────────────────
 
 def fetch_news(client: OpenAI) -> dict:
     """
-    OpenAI Responses API + web_search で4カテゴリのニュースを取得し、
-    パース済みの dict を返す。
+    2ステップでニュースを取得し、パース済みの dict を返す。
+
+    Step 1: responses.create + web_search
+      → ニュースをテキストで収集（形式は問わない）
+    Step 2: chat.completions.create + json_object モード
+      → Step1 のテキストを受け取り、有効な JSON に変換（必ず成功する）
     """
     jst = pytz.timezone("Asia/Tokyo")
     today = datetime.now(jst).strftime("%Y-%m-%d")
 
-    response = client.responses.create(
+    # ── Step 1: Web 検索でニュース収集 ──────────────────────────────────────
+    print("Step 1: web_search でニュース収集中...")
+    search_resp = client.responses.create(
         model="gpt-4.1-mini",
         tools=[{"type": "web_search"}],
-        instructions=INSTRUCTIONS,
+        instructions=SEARCH_INSTRUCTIONS,
         input=(
-            "Search today's web for the latest news in all four categories "
-            "(AI & Machine Learning, Technology, World Politics & Economy, "
-            f"Airline Deals & Travel). Today's date: {today}. "
-            "Return only the JSON as instructed."
+            f"Today is {today}. Search the web and write the news report "
+            "for all four categories as instructed."
         ),
     )
+    raw_news_text = search_resp.output_text
+    print(f"Step 1 完了: {len(raw_news_text)} 文字取得")
 
-    raw = response.output_text
-    data = _extract_json(raw)
+    # ── Step 2: テキスト → JSON（json_object モードで有効な JSON を保証） ──
+    print("Step 2: テキストを JSON に変換中...")
+    format_resp = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": FORMAT_INSTRUCTIONS},
+            {"role": "user",   "content": raw_news_text},
+        ],
+        max_tokens=4096,
+    )
+    raw_json = format_resp.choices[0].message.content
+    data = json.loads(raw_json)   # json_object モードなので必ず有効な JSON
 
-    # 最低限のスキーマ検証
     categories = data.get("categories", [])
     if len(categories) != 4:
         raise ValueError(
             f"Expected 4 categories in JSON, got {len(categories)}. "
-            f"Raw output (first 200 chars): {raw[:200]}"
+            f"Raw (first 300 chars): {raw_json[:300]}"
         )
 
+    cat_ids = [c.get("id") for c in categories]
+    print(f"Step 2 完了: categories = {cat_ids}")
     return data
 
 
@@ -205,22 +216,22 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
     c = cfg["color"]
     grad = cfg["gradient"]
 
-    articles = cat_data.get("articles", [])
+    articles  = cat_data.get("articles", [])
     summary_en = cat_data.get("summary_en", "")
     summary_ja = cat_data.get("summary_ja", "")
     vocabulary = cat_data.get("vocabulary", [])
 
-    # ── 記事リスト（URLをクリッカブルリンクに） ──
+    # ── 記事リスト（URLをクリッカブルリンクに） ──────────────────────────────
     articles_html = ""
     for i, art in enumerate(articles[:3], 1):
-        url = art.get("url", "#") or "#"
-        title = art.get("title", "（タイトル不明）")
+        url    = art.get("url") or "#"
+        title  = art.get("title", "（タイトル不明）")
         source = art.get("source", "")
 
         source_badge = (
             f'<span class="text-xs text-{c}-700 bg-{c}-50 border border-{c}-100 '
-            f"px-2 py-0.5 rounded-full font-medium leading-none mt-1.5 inline-block\">"
-            f"{esc(source)}</span>"
+            f'px-2 py-0.5 rounded-full font-medium leading-none mt-1.5 inline-block">'
+            f'{esc(source)}</span>'
         ) if source else ""
 
         articles_html += f"""
@@ -234,21 +245,17 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
             <span class="text-slate-300 group-hover:text-{c}-400 text-lg mt-0.5 shrink-0 transition-colors">›</span>
           </a>"""
 
-    # ── サマリー（英語） ──
+    # ── サマリー（英語・日本語） ─────────────────────────────────────────────
     en_paras = "".join(
         f'<p class="text-sm text-slate-700 leading-relaxed mt-3">{esc(p)}</p>'
-        for p in summary_en.split("\n")
-        if p.strip()
+        for p in summary_en.split("\n") if p.strip()
     )
-
-    # ── サマリー（日本語） ──
     ja_paras = "".join(
         f'<p class="text-sm text-slate-700 leading-relaxed mt-3">{esc(p)}</p>'
-        for p in summary_ja.split("\n")
-        if p.strip()
+        for p in summary_ja.split("\n") if p.strip()
     )
 
-    # ── ボキャブラリー accordion ──
+    # ── ボキャブラリー accordion ─────────────────────────────────────────────
     vocab_rows = "".join(
         f"""
               <div class="flex items-center gap-2 px-4 py-3 border-b border-{c}-100 last:border-b-0 bg-white">
@@ -295,24 +302,17 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
         </div>
 
         <div class="bg-{c}-50 border-t-2 border-{c}-100 px-5 py-5">
-
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
             <span class="text-xs font-bold uppercase tracking-wider text-{c}-600">English</span>
           </div>
-          <div class="mb-5">
-            {en_paras}
-          </div>
-
+          <div class="mb-5">{en_paras}</div>
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-{c}-200"></div>
             <span class="text-xs text-{c}-400 font-semibold">🇯🇵 日本語訳</span>
             <div class="flex-1 h-px bg-{c}-200"></div>
           </div>
-          <div>
-            {ja_paras}
-          </div>
-
+          <div>{ja_paras}</div>
           {vocab_section}
         </div>
 
@@ -321,14 +321,10 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
 
 
 def generate_html(news_data: dict | None, date_str: str) -> str:
-    """
-    JSON データから完全な HTML レポートを生成する。
-    news_data が None の場合はエラーページを返す。
-    """
+    """JSON データから完全な HTML レポートを生成する。"""
     esc = _html.escape
 
     if news_data:
-        # JSON の categories を id でインデックス化し、CATEGORIES_CONFIG の順で HTML を構築
         cat_by_id = {c["id"]: c for c in news_data.get("categories", [])}
         sections_html = "\n".join(
             _category_section_html(cat_by_id.get(cfg["id"], {}), cfg)
@@ -368,7 +364,7 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Intelligence — {esc(date_str)}</title>
+  <title>Daily Intelligence &mdash; {esc(date_str)}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {{ --nav-h: 48px; }}
@@ -436,8 +432,8 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
   </main>
 
   <footer class="max-w-2xl mx-auto px-4 py-8 text-center text-xs text-slate-400 space-y-1">
-    <p>Daily Intelligence • {esc(date_str)}</p>
-    <p>Generated automatically · <a href="{GITHUB_PAGES_URL}" class="underline hover:text-slate-300 transition-colors">daily-report</a></p>
+    <p>Daily Intelligence &bull; {esc(date_str)}</p>
+    <p>Generated automatically &middot; <a href="{GITHUB_PAGES_URL}" class="underline hover:text-slate-300 transition-colors">daily-report</a></p>
   </footer>
 
   <script>
@@ -448,8 +444,7 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
         entries.forEach(e => {{
           if (e.isIntersecting) {{
             tabs.forEach(t => {{
-              const active = t.dataset.section === e.target.id;
-              t.classList.toggle('font-semibold', active);
+              t.classList.toggle('font-semibold', t.dataset.section === e.target.id);
             }});
           }}
         }});
@@ -515,23 +510,21 @@ def main() -> None:
         f"{now.strftime('%H:%M')}"
     )
 
-    # Step 1: ニュースを JSON で取得
+    # Step 1+2: ニュースを JSON で取得
     news_data: dict | None = None
     try:
         news_data = fetch_news(client)
-        cat_ids = [c["id"] for c in news_data.get("categories", [])]
-        print(f"SUCCESS: ニュース取得完了 — categories: {cat_ids}")
     except Exception as e:
         print(f"ERROR [fetch_news]: {safe_error(e)}")
 
-    # Step 2: HTML 生成 → 保存
+    # HTML 生成 → 保存
     try:
         html_content = generate_html(news_data, date_str)
         save_html(html_content)
     except Exception as e:
         print(f"ERROR [generate_html]: {safe_error(e)}")
 
-    # Step 3: LINE に URL 通知を送信
+    # LINE に URL 通知を送信
     try:
         send_to_line([build_line_message(date_str)])
         print("SUCCESS: LINE 送信完了")
