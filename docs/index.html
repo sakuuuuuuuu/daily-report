@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Intelligence &mdash; 2026年5月5日（火）23:52</title>
+  <title>Daily Intelligence &mdash; 2026年5月6日（水）00:10</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root { --nav-h: 48px; }
@@ -29,13 +29,20 @@
     details > summary::-webkit-details-marker { display: none; }
     .chevron { transition: transform 0.2s ease; }
     details[open] > summary .chevron { transform: rotate(180deg); }
+    .vocab-chevron { transition: transform 0.2s ease; }
+    details[open] > summary .vocab-chevron { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: reduce) {
+      .card { animation: none; }
+      .article-link { transition: none; }
+      .chevron, .vocab-chevron { transition: none; }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased">
 
   <nav class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
     <div class="max-w-2xl mx-auto overflow-x-auto no-scrollbar">
-      <div class="flex min-w-max" id="nav-tabs"><a href="#ai" data-section="ai" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-colors hover:text-blue-600"><span>🤖</span> AI</a><a href="#tech" data-section="tech" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-colors hover:text-purple-600"><span>💻</span> Technology</a><a href="#world" data-section="world" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-colors hover:text-emerald-600"><span>🌍</span> World</a><a href="#flights" data-section="flights" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-colors hover:text-amber-600"><span>✈️</span> Airline</a></div>
+      <div class="flex min-w-max" id="nav-tabs"><a href="#ai" data-section="ai" data-color="blue" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-all hover:text-blue-600"><span>🤖</span> AI</a><a href="#tech" data-section="tech" data-color="purple" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-all hover:text-purple-600"><span>💻</span> Tech</a><a href="#world" data-section="world" data-color="emerald" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-all hover:text-emerald-600"><span>🌍</span> World</a><a href="#flights" data-section="flights" data-color="amber" class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-all hover:text-amber-600"><span>✈️</span> Flights</a></div>
     </div>
   </nav>
 
@@ -45,19 +52,19 @@
         <div>
           <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-1.5">Daily Intelligence Report</p>
           <h1 class="text-2xl font-extrabold leading-tight">Today's Briefing</h1>
-          <p class="text-slate-400 text-sm mt-1">2026年5月5日（火）23:52</p>
+          <p class="text-slate-400 text-sm mt-1">2026年5月6日（水）00:10</p>
         </div>
         <div class="inline-flex items-center gap-1.5 bg-green-500/15 border border-green-500/25 text-green-300 text-xs font-medium px-2.5 py-1.5 rounded-full">
           <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
           Updated
         </div>
       </div>
-      <div class="flex flex-wrap gap-2 mb-6"><a href="#ai" class="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/25 px-2.5 py-1 rounded-full hover:bg-blue-500/25 transition-colors">🤖 AI</a><a href="#tech" class="inline-flex items-center gap-1 text-xs bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2.5 py-1 rounded-full hover:bg-purple-500/25 transition-colors">💻 Technology</a><a href="#world" class="inline-flex items-center gap-1 text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 px-2.5 py-1 rounded-full hover:bg-emerald-500/25 transition-colors">🌍 World</a><a href="#flights" class="inline-flex items-center gap-1 text-xs bg-amber-500/15 text-amber-300 border border-amber-500/25 px-2.5 py-1 rounded-full hover:bg-amber-500/25 transition-colors">✈️ Airline</a></div>
+      <div class="flex flex-wrap gap-2 mb-6"><a href="#ai" class="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 border border-blue-500/25 px-2.5 py-1 rounded-full hover:bg-blue-500/25 transition-colors">🤖 AI</a><a href="#tech" class="inline-flex items-center gap-1 text-xs bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2.5 py-1 rounded-full hover:bg-purple-500/25 transition-colors">💻 Tech</a><a href="#world" class="inline-flex items-center gap-1 text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 px-2.5 py-1 rounded-full hover:bg-emerald-500/25 transition-colors">🌍 World</a><a href="#flights" class="inline-flex items-center gap-1 text-xs bg-amber-500/15 text-amber-300 border border-amber-500/25 px-2.5 py-1 rounded-full hover:bg-amber-500/25 transition-colors">✈️ Flights</a></div>
       <div class="grid grid-cols-4 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">12</p><p class="text-xs text-slate-500 mt-0.5">Articles</p></div>
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">Categories</p></div>
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">Summaries</p></div>
-        <div class="text-center py-3"><p class="text-lg font-bold text-indigo-300">EN/JP</p><p class="text-xs text-slate-500 mt-0.5">Bilingual</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">12</p><p class="text-xs text-slate-500 mt-0.5">記事数</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">カテゴリ</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">要約</p></div>
+        <div class="text-center py-3"><p class="text-lg font-bold text-indigo-300">EN/JP</p><p class="text-xs text-slate-500 mt-0.5">バイリンガル</p></div>
       </div>
     </div>
   </header>
@@ -112,45 +119,26 @@
         <div class="bg-blue-50 border-t-2 border-blue-100 px-5 py-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
-            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">English</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">English Summary</span>
           </div>
-          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Recent developments in AI and machine learning have highlighted significant advancements and challenges. OpenAI&#x27;s image generation model, ChatGPT Images 2.0, has evolved with improvements such as resolving text garbling issues, enhancing the quality and accuracy of generated images. In parallel, the UK&#x27;s AISI agency assessed that OpenAI&#x27;s GPT-5.5 model possesses cyberattack capabilities comparable to Anthropic&#x27;s Claude Mythos Preview, indicating a general trend of increasing power among AI models in cybersecurity contexts. Meanwhile, OpenAI identified and addressed an unusual rise in &#x27;goblin&#x27; metaphors in ChatGPT responses, traced to the overemphasis of an &#x27;otaku&#x27; personality trait during training. Although this issue affected successor models, OpenAI has implemented strategies such as removing personality settings and prompt-based controls to mitigate this problem. These developments reflect both the advancement in AI&#x27;s generative and security-related capabilities and the ongoing adjustments needed to ensure responsible and accurate outputs.</p></div>
+          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Recent developments in AI and machine learning highlight significant advancements in OpenAI&#x27;s models. The image generation capability of ChatGPT has evolved with the release of ChatGPT Images 2.0, focusing on improvements such as resolving text corruption issues, as shared by the developers. Meanwhile, the UK’s AISI agency evaluated GPT-5.5 and found its cyberattack capabilities comparable to Claude Mythos Preview, indicating a trend of capability enhancement across the AI industry. Additionally, OpenAI addressed a mysterious increase in references to &#x27;goblins&#x27; in ChatGPT responses, which originated from an overemphasis on an &#x27;otaku&#x27; personality setting during training. This issue affected successor models as well but has been mitigated through the removal of personality features and prompt-based controls. These updates demonstrate ongoing efforts to refine AI models&#x27; functionality and safety, balancing innovation with responsible usage.</p></div>
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-blue-200"></div>
             <span class="text-xs text-blue-400 font-semibold">🇯🇵 日本語訳</span>
             <div class="flex-1 h-px bg-blue-200"></div>
           </div>
-          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">最近のAIと機械学習の進展では、大きな進化と課題が浮き彫りとなっています。OpenAIの画像生成モデル「ChatGPT Images 2.0」は、文字化けの解消など品質と精度の向上が実現されました。一方、英国のAISIはOpenAIの「GPT-5.5」がAnthropicの「Claude Mythos Preview」と同等のサイバー攻撃能力を持つと評価し、AIモデルのサイバーセキュリティ分野での能力向上の傾向を示しています。また、ChatGPTの回答における「ゴブリン」比喩の急増は、訓練時の「オタク」人格設定の過剰評価が原因と判明し、OpenAIは人格設定の廃止やプロンプトによる対策でこれを修正済みです。これらの動きは、AIの生成能力やセキュリティ能力の進化と、責任ある出力の維持のために継続的な調整が必要であることを示しています。</p></div>
+          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">最近のAI・機械学習の動向では、OpenAIのモデルに著しい進化が見られる。ChatGPTの画像生成は「ChatGPT Images 2.0」として改良され、文字化け問題の解消などが実現された。英国AISIはGPT-5.5のサイバー攻撃能力をClaude Mythos Previewと同等と評価し、AI業界全体で能力向上の傾向が示唆された。また、ChatGPTの回答に「ゴブリン」の比喩が急増した問題は、「オタク」人格設定の学習過程での過剰評価が原因と判明。後続モデルにも影響があったが、人格の廃止やプロンプトによる抑制で現在は改善されている。これらの進展は、AIモデルの機能性と安全性向上に向けた継続的な取り組みを反映している。</p></div>
           
           <details class="mt-5 rounded-xl overflow-hidden border border-blue-200">
-            <summary class="flex items-center justify-between px-4 py-3 bg-blue-100/70 cursor-pointer select-none">
+            <summary class="flex items-center justify-between px-4 py-3 bg-blue-100/70 cursor-pointer select-none list-none">
               <div class="flex items-center gap-2">
                 <span class="text-sm">📖</span>
                 <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Vocabulary</span>
+                <span class="text-xs text-blue-500 font-normal">— タップで例文を表示</span>
               </div>
               <span class="chevron text-blue-400 text-xs">▼</span>
             </summary>
-            <div class="divide-y divide-blue-100">
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-blue-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">generation</span>
-                <span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">生成、作成</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-blue-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">assessment</span>
-                <span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">評価、査定</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-blue-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">mitigate</span>
-                <span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">v.</span>
-                <span class="text-xs text-slate-600">軽減する、和らげる</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-blue-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">personality</span>
-                <span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">性格、人格</span>
-              </div></div>
+            <div class="divide-y divide-blue-100 bg-white"><details class="border-b border-blue-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-blue-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">capability</span><span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">能力、性能</span><span class="vocab-chevron text-blue-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-blue-200"><p class="text-xs text-slate-500 italic">&ldquo;The AI&#x27;s capability for image generation has greatly improved.&rdquo;</p></div></details><details class="border-b border-blue-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-blue-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">mitigate</span><span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">v.</span><span class="text-xs text-slate-600 flex-1">軽減する、和らげる</span><span class="vocab-chevron text-blue-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-blue-200"><p class="text-xs text-slate-500 italic">&ldquo;OpenAI took steps to mitigate the issue with personality settings.&rdquo;</p></div></details><details class="border-b border-blue-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-blue-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">trend</span><span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">傾向、流行</span><span class="vocab-chevron text-blue-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-blue-200"><p class="text-xs text-slate-500 italic">&ldquo;There is a trend of increasing AI model capabilities in the industry.&rdquo;</p></div></details><details class="border-b border-blue-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-blue-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">personality</span><span class="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">人格、特性</span><span class="vocab-chevron text-blue-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-blue-200"><p class="text-xs text-slate-500 italic">&ldquo;The AI&#x27;s personality setting caused unexpected response patterns.&rdquo;</p></div></details></div>
           </details>
         </div>
 
@@ -205,45 +193,26 @@
         <div class="bg-purple-50 border-t-2 border-purple-100 px-5 py-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
-            <span class="text-xs font-bold uppercase tracking-wider text-purple-600">English</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-purple-600">English Summary</span>
           </div>
-          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">The articles cover recent developments in gaming hardware, cybersecurity, and audio technology. The first article highlights the 8BitDo Ultimate 2, a highly customizable gaming controller that allows users to extensively program macros and button layouts, enhancing gameplay and appealing to gamers who enjoy fine-tuning their equipment. The second article reports on a new security initiative involving Rakuten Card users, where a warning system has been implemented in collaboration with a cybersecurity firm to alert users if they are suspected of entering information on phishing sites, aiming to prevent fraud and protect sensitive data. Lastly, the third article discusses Apple&#x27;s rumored new AirPods model, the &#x27;AirPods Ultra,&#x27; which is expected to be released later this year. This model is anticipated to include advanced features like a camera and AI integration, potentially offering an enhanced audio and user experience. Together, these stories reflect ongoing trends in personalized gaming accessories, increasing online security measures, and the advancement of consumer tech devices with sophisticated functionalities.</p></div>
+          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">The articles cover recent developments in consumer technology and cybersecurity. The 8BitDo Ultimate 2 controller offers extensive customization options, including macros and button mapping, allowing gamers to deeply personalize their experience and enhance gameplay. This controller appeals to players who value both performance and creativity. In cybersecurity, Rakuten Card has begun issuing warnings to users suspected of entering their information on fraudulent websites, in cooperation with security firms, aiming to prevent financial fraud and protect consumers. Meanwhile, Apple is rumored to be launching a new AirPods model called &quot;AirPods Ultra&quot; later this year. This new device is expected to feature advanced capabilities such as integrated cameras and AI technologies, signaling Apple&#x27;s push for more sophisticated wireless audio products. These developments illustrate ongoing innovation in both hardware customization for gaming and enhanced security measures, alongside next-generation consumer electronics with smart features.</p></div>
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-purple-200"></div>
             <span class="text-xs text-purple-400 font-semibold">🇯🇵 日本語訳</span>
             <div class="flex-1 h-px bg-purple-200"></div>
           </div>
-          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">記事は、ゲーム用ハードウェア、サイバーセキュリティ、オーディオ技術の最新動向を伝えています。最初の記事では、マクロやボタン配置を自由に設定できるカスタマイズ性に優れたゲームコントローラー「8BitDo Ultimate 2」が紹介され、ゲームプレイを向上させる魅力が解説されています。次に、楽天カード利用者を対象に、詐欺サイトへの入力の疑いがある場合に警告を行う新たなセキュリティ対策がサイバーセキュリティ企業との連携で開始され、詐欺防止と個人情報保護を目指しています。最後に、アップルの新型AirPods「AirPods Ultra」の噂が取り上げられ、カメラやAI機能の搭載が見込まれ、ユーザー体験の向上に期待が寄せられています。これらの話題は、カスタマイズ製品の進化、オンライン安全対策の強化、そして高度な機能を備えた消費者向け技術の発展を示しています。</p></div>
+          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">記事は、消費者向け技術とサイバーセキュリティの最近の動向を紹介しています。8BitDo Ultimate 2コントローラーは、マクロやボタン配置の詳細なカスタマイズが可能で、ゲーマーがプレイ体験を深くパーソナライズできる製品です。楽天カードは、セキュリティ企業と連携し、詐欺サイトに情報を入力した疑いのある利用者に警告を開始し、消費者保護を強化しています。一方、アップルは「AirPods Ultra」と呼ばれる新型モデルを今年後半に発売予定で、カメラやAI搭載など高度な機能が期待されています。ゲーム用ハードのカスタマイズ性向上やセキュリティ対策強化、AI搭載の次世代電子機器の進展が伺えます。</p></div>
           
           <details class="mt-5 rounded-xl overflow-hidden border border-purple-200">
-            <summary class="flex items-center justify-between px-4 py-3 bg-purple-100/70 cursor-pointer select-none">
+            <summary class="flex items-center justify-between px-4 py-3 bg-purple-100/70 cursor-pointer select-none list-none">
               <div class="flex items-center gap-2">
                 <span class="text-sm">📖</span>
                 <span class="text-xs font-bold uppercase tracking-wider text-purple-700">Vocabulary</span>
+                <span class="text-xs text-purple-500 font-normal">— タップで例文を表示</span>
               </div>
               <span class="chevron text-purple-400 text-xs">▼</span>
             </summary>
-            <div class="divide-y divide-purple-100">
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-purple-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">customizable</span>
-                <span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">adj.</span>
-                <span class="text-xs text-slate-600">カスタマイズ可能な</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-purple-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">initiative</span>
-                <span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">新しい取り組み、計画</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-purple-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">suspected</span>
-                <span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">adj.</span>
-                <span class="text-xs text-slate-600">疑われている</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-purple-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">integration</span>
-                <span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">統合、組み込み</span>
-              </div></div>
+            <div class="divide-y divide-purple-100 bg-white"><details class="border-b border-purple-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-purple-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">customization</span><span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">カスタマイズ、個別調整</span><span class="vocab-chevron text-purple-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-purple-200"><p class="text-xs text-slate-500 italic">&ldquo;The controller offers extensive customization options for gamers.&rdquo;</p></div></details><details class="border-b border-purple-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-purple-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">warn</span><span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">v.</span><span class="text-xs text-slate-600 flex-1">警告する</span><span class="vocab-chevron text-purple-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-purple-200"><p class="text-xs text-slate-500 italic">&ldquo;Rakuten Card warns users about fraudulent websites.&rdquo;</p></div></details><details class="border-b border-purple-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-purple-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">feature</span><span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">特徴、機能</span><span class="vocab-chevron text-purple-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-purple-200"><p class="text-xs text-slate-500 italic">&ldquo;The AirPods Ultra will feature an integrated camera and AI.&rdquo;</p></div></details><details class="border-b border-purple-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-purple-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">enhance</span><span class="text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">v.</span><span class="text-xs text-slate-600 flex-1">向上させる、強化する</span><span class="vocab-chevron text-purple-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-purple-200"><p class="text-xs text-slate-500 italic">&ldquo;Macros enhance the gaming experience on the controller.&rdquo;</p></div></details></div>
           </details>
         </div>
 
@@ -298,45 +267,26 @@
         <div class="bg-emerald-50 border-t-2 border-emerald-100 px-5 py-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
-            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">English</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">English Summary</span>
           </div>
-          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Japan and the European Union held a ministerial-level meeting in Belgium focusing on children&#x27;s use of social media, agreeing to strengthen information sharing on regulatory efforts. Meanwhile, tensions persist in the Persian Gulf as the United States began escorting vessels through the Strait of Hormuz, prompting Iran&#x27;s parliamentary leader to warn of possible further responses. Attacks on vessels near the Strait involving South Korean and UAE ships have added to the regional instability. On another front, Japan and the Philippines engaged in defense talks during which they agreed to establish a working group to facilitate the early transfer of used Japanese destroyers, following Japan&#x27;s recent policy shift to allow arms exports in principle. These developments reflect ongoing efforts in digital regulation, regional security, and defense cooperation amid complex geopolitical tensions.</p></div>
+          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Japan and the European Union (EU) have issued a joint statement from a ministerial meeting in Belgium to enhance information sharing on regulating children&#x27;s use of social media platforms. This reflects growing concerns about protecting children&#x27;s online experiences. Meanwhile, tensions remain high in the Strait of Hormuz, where the United States has begun escorting vessels through the strategic waterway in the Persian Gulf. Iran has warned of potential further responses, escalating regional security risks, especially after reported attacks on South Korean and UAE ships anchored nearby. In defense diplomacy, Japan&#x27;s Defense Minister Koizumi met with Philippine Defense Secretary Teodoro to discuss security cooperation. They agreed to establish a working group aimed at expediting the transfer of used Japanese escort vessels to the Philippines. This follows Japan&#x27;s recent policy change allowing the export of weapons with destructive capacity, marking a significant step in Japan-Philippines defense ties. Together, these developments underscore intensifying international efforts in digital regulation, maritime security, and regional defense partnerships amid evolving geopolitical challenges.</p></div>
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-emerald-200"></div>
             <span class="text-xs text-emerald-400 font-semibold">🇯🇵 日本語訳</span>
             <div class="flex-1 h-px bg-emerald-200"></div>
           </div>
-          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">日本とEUはベルギーで閣僚級会合を開き、子どものSNS利用に関する規制強化へ向けて情報共有を強化することで合意しました。一方、米国がホルムズ海峡で船舶の護衛を始める中、イランの議長はさらなる対応も辞さない姿勢を示し、韓国やUAEの船舶に対する攻撃が報じられるなど緊張が続いています。さらに、日本とフィリピンは防衛相会談で、中古護衛艦移転を加速させるための防衛当局間ワーキンググループ設置に合意しました。これらは、デジタル規制や地域安全保障、防衛協力をめぐる複雑な国際情勢の中での重要な動きです。</p></div>
+          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">日本とEUは、ベルギーでの閣僚級会合で、子どものSNS利用規制に関する情報共有の強化を盛り込んだ共同声明を発表しました。これは子どものオンライン環境保護への関心の高まりを反映しています。一方、ペルシャ湾のホルムズ海峡では、米国が船舶の護送を開始したことに対し、イランがさらなる対応を示唆し地域の緊張が続いています。韓国やUAEの船舶が攻撃を受けたことも報告されています。防衛外交では、小泉防衛大臣がフィリピンのテオドロ国防相と会談し、中古護衛艦の早期移転に向けたワーキンググループ設置で合意しました。これは、日本の武器輸出規制緩和に伴うもので、日比防衛協力の強化を象徴しています。これらの動きは、デジタル規制、海上安全保障、地域防衛協力の国際的取り組みの強化を示しています。</p></div>
           
           <details class="mt-5 rounded-xl overflow-hidden border border-emerald-200">
-            <summary class="flex items-center justify-between px-4 py-3 bg-emerald-100/70 cursor-pointer select-none">
+            <summary class="flex items-center justify-between px-4 py-3 bg-emerald-100/70 cursor-pointer select-none list-none">
               <div class="flex items-center gap-2">
                 <span class="text-sm">📖</span>
                 <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Vocabulary</span>
+                <span class="text-xs text-emerald-500 font-normal">— タップで例文を表示</span>
               </div>
               <span class="chevron text-emerald-400 text-xs">▼</span>
             </summary>
-            <div class="divide-y divide-emerald-100">
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-emerald-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">regulation</span>
-                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">規制</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-emerald-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">tension</span>
-                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">緊張</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-emerald-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">escort</span>
-                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">v.</span>
-                <span class="text-xs text-slate-600">護衛する</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-emerald-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">facilitate</span>
-                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">v.</span>
-                <span class="text-xs text-slate-600">促進する</span>
-              </div></div>
+            <div class="divide-y divide-emerald-100 bg-white"><details class="border-b border-emerald-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-emerald-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">enhance</span><span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">v.</span><span class="text-xs text-slate-600 flex-1">強化する</span><span class="vocab-chevron text-emerald-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-emerald-200"><p class="text-xs text-slate-500 italic">&ldquo;They aim to enhance information sharing between countries.&rdquo;</p></div></details><details class="border-b border-emerald-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-emerald-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">tensions</span><span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">緊張状態</span><span class="vocab-chevron text-emerald-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-emerald-200"><p class="text-xs text-slate-500 italic">&ldquo;Tensions remain high near the Strait of Hormuz.&rdquo;</p></div></details><details class="border-b border-emerald-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-emerald-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">expedite</span><span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">v.</span><span class="text-xs text-slate-600 flex-1">促進する、迅速に進める</span><span class="vocab-chevron text-emerald-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-emerald-200"><p class="text-xs text-slate-500 italic">&ldquo;They agreed to expedite the transfer of defense vessels.&rdquo;</p></div></details><details class="border-b border-emerald-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-emerald-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">ongoing</span><span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">adj.</span><span class="text-xs text-slate-600 flex-1">継続中の</span><span class="vocab-chevron text-emerald-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-emerald-200"><p class="text-xs text-slate-500 italic">&ldquo;Ongoing negotiations address digital regulation challenges.&rdquo;</p></div></details></div>
           </details>
         </div>
 
@@ -391,45 +341,26 @@
         <div class="bg-amber-50 border-t-2 border-amber-100 px-5 py-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
-            <span class="text-xs font-bold uppercase tracking-wider text-amber-600">English</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-600">English Summary</span>
           </div>
-          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Several travel promotions relevant to Japan have been announced. Etihad Airways is offering up to 30% off on business class fares for flights departing from Tokyo (Narita) and Osaka (Kansai). The discounted fares start from 327,000 JPY round-trip, and the promotion runs from May 3 to May 7, applicable for travel until August 31. Meanwhile, T&#x27;way Air launched a special “t’割” sale exclusively on their official website throughout May. The sale features discounted one-way total fares from 13,520 JPY on routes between Japan and South Korea, including fuel surcharges and airport fees. Customers can apply a discount code &quot;MAY26&quot; for these fares. Additionally, H.I.S. is running a time sale on last-minute overseas travel packages departing from the Tokyo metropolitan area. The sale began on May 1 and lasts until May 8, featuring short trips like a 3-day Seoul tour from 27,800 JPY using Air Seoul, among other offers. These promotions provide an opportunity for cost-conscious travelers in Japan to access discounted international flights and vacations in May and August.</p></div>
+          <div class="mb-5"><p class="text-sm text-slate-700 leading-relaxed mt-3">Several travel and airline promotions relevant to Japan have been announced. Etihad Airways is offering up to 30% off on business class fares for round-trip flights departing from Tokyo Narita and Osaka Kansai, with prices starting from JPY 327,000. This sale runs from May 3 to May 7, with a travel period valid until August 31, 2024. The discount applies only to the fare portion. Meanwhile, T&#x27;way Air is holding a &#x27;t&#x27;割&#x27; sale throughout May on select Japan-South Korea routes with one-way total fares starting at JPY 13,520, inclusive of fuel surcharges and airport fees. Customers booking Japan departures can use a promotional code for the discount via the airline’s official website. Lastly, travel agency HIS has launched a time-limited sale from May 1 to May 8 focusing on last-minute trips departing from the Tokyo metropolitan area. Example offers include a 3-day Seoul package with Air Seoul from JPY 27,800 and a trip to Taipei. These promotions provide attractive discounts for travelers planning trips to Asia during the coming months.</p></div>
           <div class="flex items-center gap-3 my-4">
             <div class="flex-1 h-px bg-amber-200"></div>
             <span class="text-xs text-amber-400 font-semibold">🇯🇵 日本語訳</span>
             <div class="flex-1 h-px bg-amber-200"></div>
           </div>
-          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">日本発の旅行関連で複数のセールが開催されています。エティハド航空は、東京（成田）・大阪（関西）発のビジネスクラス運賃を最大30％割引し、往復32.7万円からの特別料金を5月3日から7日まで実施、搭乗期間は8月31日までです。ティーウェイ航空は、公式サイト限定で5月中「t’割」セールを行い、日韓線の片道料金が13,520円から、燃油サーチャージと空港使用料込みで販売され、割引コード「MAY26」が利用可能です。さらに、エイチ・アイ・エス（HIS）は首都圏発の直前海外旅行のタイムセールを5月1日から8日まで開催し、エアソウル利用のソウル3日間が27,800円などのプランを提供しています。これらのセールは、日本からの国際線や海外旅行をお得に楽しむ機会となっています。※情報の正確性は各社公式サイトでご確認ください</p></div>
+          <div><p class="text-sm text-slate-700 leading-relaxed mt-3">日本発の旅行や航空券に関するセール情報が発表されました。エティハド航空は東京・成田および大阪・関西発のビジネスクラス往復運賃を最大30％オフで提供しており、価格は32万7千円からです。期間は5月3日から7日までで、搭乗は8月31日まで可能です。ティーウェイ航空は5月中に日本と韓国間の一部路線で「t’割」セールを開催し、燃油料と空港使用料込みで片道13,520円からの運賃を提供しています。HISは首都圏発の直前海外旅行を対象としたタイムセールを5月1日から8日まで実施し、ソウル3日間27,800円などお得なツアーを販売しています。これらのセールは今後のアジア旅行を計画する人にとって魅力的な割引です。※情報の正確性は各社公式サイトでご確認ください</p></div>
           
           <details class="mt-5 rounded-xl overflow-hidden border border-amber-200">
-            <summary class="flex items-center justify-between px-4 py-3 bg-amber-100/70 cursor-pointer select-none">
+            <summary class="flex items-center justify-between px-4 py-3 bg-amber-100/70 cursor-pointer select-none list-none">
               <div class="flex items-center gap-2">
                 <span class="text-sm">📖</span>
                 <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Vocabulary</span>
+                <span class="text-xs text-amber-500 font-normal">— タップで例文を表示</span>
               </div>
               <span class="chevron text-amber-400 text-xs">▼</span>
             </summary>
-            <div class="divide-y divide-amber-100">
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-amber-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">promotion</span>
-                <span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">販売促進、プロモーション</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-amber-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">discounted</span>
-                <span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">adj.</span>
-                <span class="text-xs text-slate-600">割引された</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-amber-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">exclusive</span>
-                <span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">adj.</span>
-                <span class="text-xs text-slate-600">限定の</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-amber-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">fare</span>
-                <span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">n.</span>
-                <span class="text-xs text-slate-600">運賃</span>
-              </div></div>
+            <div class="divide-y divide-amber-100 bg-white"><details class="border-b border-amber-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-amber-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">fare</span><span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">運賃</span><span class="vocab-chevron text-amber-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-amber-200"><p class="text-xs text-slate-500 italic">&ldquo;The discount applies only to the fare portion of the ticket.&rdquo;</p></div></details><details class="border-b border-amber-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-amber-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">departure</span><span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">出発</span><span class="vocab-chevron text-amber-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-amber-200"><p class="text-xs text-slate-500 italic">&ldquo;Flights departing from Tokyo Narita are included in the sale.&rdquo;</p></div></details><details class="border-b border-amber-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-amber-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">promotion</span><span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">n.</span><span class="text-xs text-slate-600 flex-1">販促、プロモーション</span><span class="vocab-chevron text-amber-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-amber-200"><p class="text-xs text-slate-500 italic">&ldquo;Several promotions are running for flights and travel packages.&rdquo;</p></div></details><details class="border-b border-amber-100 last:border-b-0 group/vocab"><summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-amber-50/60 transition-colors"><span class="font-bold text-sm text-slate-800">valid</span><span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">adj.</span><span class="text-xs text-slate-600 flex-1">有効な、期間内の</span><span class="vocab-chevron text-amber-300 text-xs shrink-0 transition-transform duration-200">▼</span></summary><div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-amber-200"><p class="text-xs text-slate-500 italic">&ldquo;The travel period is valid until August 31, 2024.&rdquo;</p></div></details></div>
           </details>
         </div>
 
@@ -438,18 +369,40 @@
   </main>
 
   <footer class="max-w-2xl mx-auto px-4 py-8 text-center text-xs text-slate-400 space-y-1">
-    <p>Daily Intelligence &bull; 2026年5月5日（火）23:52</p>
+    <p>Daily Intelligence &bull; 2026年5月6日（水）00:10</p>
     <p>Generated automatically &middot; <a href="https://sakuuuuuuuu.github.io/daily-report/" class="underline hover:text-slate-300 transition-colors">daily-report</a></p>
   </footer>
 
   <script>
+    // ナビタブのアクティブ状態をセクションの交差に連動させる
+    // アクティブ時: そのカテゴリのカラーで下線＋テキスト着色（color は data-color 属性で取得）
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('section[id]');
+
+    function setActiveTab(sectionId) {
+      tabs.forEach(tab => {
+        const isActive = tab.dataset.section === sectionId;
+        const color = tab.dataset.color;
+        // リセット
+        tab.classList.remove('font-semibold', 'border-transparent', 'text-slate-500');
+        tab.classList.remove(
+          `text-blue-600`, `border-blue-500`,
+          `text-purple-600`, `border-purple-500`,
+          `text-emerald-600`, `border-emerald-500`,
+          `text-amber-600`, `border-amber-500`
+        );
+        if (isActive) {
+          tab.classList.add('font-semibold', `text-${color}-600`, `border-${color}-500`);
+        } else {
+          tab.classList.add('border-transparent', 'text-slate-500');
+        }
+      });
+    }
+
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(e => {
-          if (e.isIntersecting)
-            tabs.forEach(t => t.classList.toggle('font-semibold', t.dataset.section === e.target.id));
+          if (e.isIntersecting) setActiveTab(e.target.id);
         });
       },
       { rootMargin: '-48px 0px -60% 0px', threshold: 0 }
