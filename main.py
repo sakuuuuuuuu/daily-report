@@ -54,6 +54,7 @@ CATEGORIES_CONFIG = [
         "id": "ai",
         "emoji": "🤖",
         "name": "AI & Machine Learning",
+        "name_short": "AI",          # ナビ・LINE・バッジで使用する短縮名
         "name_ja": "人工知能・機械学習",
         "gradient": "from-blue-600 to-cyan-500",
         "color": "blue",
@@ -74,6 +75,7 @@ CATEGORIES_CONFIG = [
         "id": "tech",
         "emoji": "💻",
         "name": "Technology",
+        "name_short": "Tech",
         "name_ja": "テクノロジー",
         "gradient": "from-purple-600 to-violet-500",
         "color": "purple",
@@ -94,6 +96,7 @@ CATEGORIES_CONFIG = [
         "id": "world",
         "emoji": "🌍",
         "name": "World Politics & Economy",
+        "name_short": "World",
         "name_ja": "国際政治・経済",
         "gradient": "from-emerald-600 to-teal-500",
         "color": "emerald",
@@ -114,6 +117,7 @@ CATEGORIES_CONFIG = [
         "id": "flights",
         "emoji": "✈️",
         "name": "Airline Deals & Travel",
+        "name_short": "Flights",
         "name_ja": "航空券セール・旅行",
         "gradient": "from-amber-500 to-orange-500",
         "color": "amber",
@@ -135,12 +139,21 @@ CATEGORIES_CONFIG = [
 # ── ユーティリティ ─────────────────────────────────────────────────────────────
 
 def safe_error(e: Exception) -> str:
-    """例外メッセージからAPIキー等の機密情報をマスクして返す。"""
+    """例外メッセージからAPIキー等の機密情報をマスクして返す。
+
+    完全一致だけでなく、共通のAPIキー形式（sk-...）や
+    Bearer トークン形式もパターンマッチでマスクする。
+    """
     msg = str(e)
+    # 環境変数の実値をそのまま含む場合は完全置換
     for key_name in ["OPENAI_API_KEY", "LINE_ACCESS_TOKEN", "LINE_USER_ID"]:
         val = os.environ.get(key_name, "")
         if val and val in msg:
             msg = msg.replace(val, "***")
+    # OpenAI キー形式（sk-... / sk-proj-...）をパターンマッチでマスク
+    msg = re.sub(r"sk-[A-Za-z0-9_\-]{10,}", "***", msg)
+    # Bearer トークン形式をマスク
+    msg = re.sub(r"Bearer\s+[A-Za-z0-9._\-]{10,}", "Bearer ***", msg)
     return msg
 
 
@@ -173,6 +186,10 @@ def fetch_category_rss(cfg: dict) -> list[dict]:
                 feed_url,
                 agent="DailyIntelligence/1.0 (+https://github.com/sakuuuuuuuu/daily-report)",
             )
+            # bozo は feedparser がフィードを正常にパースできなかった場合に True になる
+            if getattr(feed, "bozo", False):
+                print(f"  [WARN] RSS parse warning [{feed_url}]: {feed.bozo_exception}")
+
             source_name = feed.feed.get("title", cfg["name"])
 
             for entry in feed.entries[:20]:  # 最新20件を候補にする
@@ -221,6 +238,7 @@ def summarize_category(client: OpenAI, articles: list[dict], cfg: dict) -> dict:
     """
     RSS から取得した記事テキストを OpenAI で要約する。
     web_search を使わず chat.completions のみ → トークン代のみ（月 ~$0.15 相当）。
+    例外は呼び出し元（fetch_news）でカテゴリ単位にハンドリングする。
     """
     if not articles:
         return {
@@ -243,13 +261,13 @@ Return ONLY a valid JSON object (no markdown fences, no other text):
   "summary_en": "Approximately 200-word English summary covering all articles",
   "summary_ja": "Natural Japanese translation of summary_en (~200字)",
   "vocabulary": [
-    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味"}},
-    {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味"}},
-    {{"word": "English word", "pos": "adj.", "meaning_ja": "日本語の意味"}},
-    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味"}}
+    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
+    {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
+    {{"word": "English word", "pos": "adj.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
+    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}}
   ]
 }}
-vocabulary: 4 TOEIC B1+ level English words chosen from summary_en."""
+vocabulary: 4 TOEIC B1+ level English words chosen from summary_en. Each "example" must be a natural English sentence (max 20 words) that shows the word in context."""
 
     articles_text = "\n\n".join(
         f"[{i}] {art['title']}\nSource: {art['source']}\nURL: {art['url']}\n{art['description']}"
@@ -263,7 +281,8 @@ vocabulary: 4 TOEIC B1+ level English words chosen from summary_en."""
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": articles_text},
         ],
-        max_tokens=1200,
+        max_tokens=1400,
+        timeout=60,
     )
 
     return json.loads(resp.choices[0].message.content)
@@ -274,6 +293,7 @@ vocabulary: 4 TOEIC B1+ level English words chosen from summary_en."""
 def fetch_news(client: OpenAI) -> dict:
     """
     全カテゴリの RSS を取得し、OpenAI で要約して dict を返す。
+    1カテゴリで summarize_category が失敗しても他カテゴリには影響しない。
     """
     categories = []
     for cfg in CATEGORIES_CONFIG:
@@ -281,7 +301,16 @@ def fetch_news(client: OpenAI) -> dict:
         articles = fetch_category_rss(cfg)
         print(f"  [{cfg['id']}] {len(articles)} 件取得 → 要約中...")
 
-        summary = summarize_category(client, articles, cfg)
+        try:
+            summary = summarize_category(client, articles, cfg)
+        except Exception as e:
+            # 1カテゴリの失敗が全体に波及しないようフォールバック
+            print(f"  [{cfg['id']}] ERROR [summarize_category]: {safe_error(e)}")
+            summary = {
+                "summary_en": "Summary unavailable due to a processing error.",
+                "summary_ja": "処理エラーのため要約を取得できませんでした。",
+                "vocabulary": [],
+            }
 
         # description は HTML 生成に不要なので article から除去して格納
         clean_articles = [
@@ -302,6 +331,43 @@ def fetch_news(client: OpenAI) -> dict:
 
 
 # ── HTML生成 ───────────────────────────────────────────────────────────────────
+
+def _vocab_item_html(v: dict, c: str, esc) -> str:
+    """語彙1件分のHTMLを生成する。example がある場合は折りたたみ形式。"""
+    word    = esc(v.get("word", ""))
+    pos     = esc(v.get("pos", ""))
+    meaning = esc(v.get("meaning_ja", ""))
+    example = v.get("example", "").strip()
+
+    header_inner = (
+        f'<span class="font-bold text-sm text-slate-800">{word}</span>'
+        f'<span class="text-xs font-semibold text-{c}-600 bg-{c}-50 border border-{c}-200 '
+        f'px-1.5 py-0.5 rounded">{pos}</span>'
+        f'<span class="text-xs text-slate-600 flex-1">{meaning}</span>'
+    )
+
+    if example:
+        return (
+            f'<details class="border-b border-{c}-100 last:border-b-0 group/vocab">'
+            f'<summary class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none '
+            f'hover:bg-{c}-50/60 transition-colors">'
+            f'{header_inner}'
+            f'<span class="vocab-chevron text-{c}-300 text-xs shrink-0 transition-transform '
+            f'duration-200">▼</span>'
+            f'</summary>'
+            f'<div class="px-4 pb-3 pt-0 ml-4 border-l-2 border-{c}-200">'
+            f'<p class="text-xs text-slate-500 italic">&ldquo;{esc(example)}&rdquo;</p>'
+            f'</div>'
+            f'</details>'
+        )
+    else:
+        return (
+            f'<div class="flex items-center gap-2 px-4 py-3 border-b border-{c}-100 '
+            f'last:border-b-0 bg-white">'
+            f'{header_inner}'
+            f'</div>'
+        )
+
 
 def _category_section_html(cat_data: dict, cfg: dict) -> str:
     """JSON の1カテゴリ分のデータから <section> HTML を生成する。"""
@@ -344,26 +410,19 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
         for p in summary_ja.split("\n") if p.strip()
     )
 
-    vocab_rows = "".join(
-        f"""
-              <div class="flex items-center gap-2 px-4 py-3 border-b border-{c}-100 last:border-b-0 bg-white">
-                <span class="font-bold text-sm text-slate-800">{esc(v.get("word",""))}</span>
-                <span class="text-xs font-semibold text-{c}-600 bg-{c}-50 border border-{c}-200 px-1.5 py-0.5 rounded">{esc(v.get("pos",""))}</span>
-                <span class="text-xs text-slate-600">{esc(v.get("meaning_ja",""))}</span>
-              </div>"""
-        for v in vocabulary
-    )
+    vocab_items = "".join(_vocab_item_html(v, c, esc) for v in vocabulary)
     vocab_section = f"""
           <details class="mt-5 rounded-xl overflow-hidden border border-{c}-200">
-            <summary class="flex items-center justify-between px-4 py-3 bg-{c}-100/70 cursor-pointer select-none">
+            <summary class="flex items-center justify-between px-4 py-3 bg-{c}-100/70 cursor-pointer select-none list-none">
               <div class="flex items-center gap-2">
                 <span class="text-sm">📖</span>
                 <span class="text-xs font-bold uppercase tracking-wider text-{c}-700">Vocabulary</span>
+                <span class="text-xs text-{c}-500 font-normal">— タップで例文を表示</span>
               </div>
               <span class="chevron text-{c}-400 text-xs">▼</span>
             </summary>
-            <div class="divide-y divide-{c}-100">{vocab_rows}</div>
-          </details>""" if vocab_rows else ""
+            <div class="divide-y divide-{c}-100 bg-white">{vocab_items}</div>
+          </details>""" if vocab_items else ""
 
     article_count = len(articles[:3])
     return f"""
@@ -388,7 +447,7 @@ def _category_section_html(cat_data: dict, cfg: dict) -> str:
         <div class="bg-{c}-50 border-t-2 border-{c}-100 px-5 py-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="text-base">🇬🇧</span>
-            <span class="text-xs font-bold uppercase tracking-wider text-{c}-600">English</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-{c}-600">English Summary</span>
           </div>
           <div class="mb-5">{en_paras}</div>
           <div class="flex items-center gap-3 my-4">
@@ -425,12 +484,13 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
         </div>"""
         article_count = 0
 
+    # name_short を使って表記を統一（ナビ・バッジ・LINE通知すべて同じ短縮名）
     nav_tabs = "".join(
-        f'<a href="#{cfg["id"]}" data-section="{cfg["id"]}"'
+        f'<a href="#{cfg["id"]}" data-section="{cfg["id"]}" data-color="{cfg["color"]}"'
         f' class="nav-tab flex items-center gap-1.5 px-4 py-3.5 text-xs font-medium'
-        f' text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-colors'
+        f' text-slate-500 border-b-2 border-transparent whitespace-nowrap transition-all'
         f' hover:text-{cfg["color"]}-600">'
-        f'<span>{cfg["emoji"]}</span> {cfg["name"].split()[0]}</a>'
+        f'<span>{cfg["emoji"]}</span> {esc(cfg["name_short"])}</a>'
         for cfg in CATEGORIES_CONFIG
     )
     hero_badges = "".join(
@@ -438,7 +498,7 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
         f' bg-{cfg["color"]}-500/15 text-{cfg["color"]}-300'
         f' border border-{cfg["color"]}-500/25 px-2.5 py-1 rounded-full'
         f' hover:bg-{cfg["color"]}-500/25 transition-colors">'
-        f'{cfg["emoji"]} {cfg["name"].split()[0]}</a>'
+        f'{cfg["emoji"]} {esc(cfg["name_short"])}</a>'
         for cfg in CATEGORIES_CONFIG
     )
 
@@ -473,6 +533,13 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
     details > summary::-webkit-details-marker {{ display: none; }}
     .chevron {{ transition: transform 0.2s ease; }}
     details[open] > summary .chevron {{ transform: rotate(180deg); }}
+    .vocab-chevron {{ transition: transform 0.2s ease; }}
+    details[open] > summary .vocab-chevron {{ transform: rotate(180deg); }}
+    @media (prefers-reduced-motion: reduce) {{
+      .card {{ animation: none; }}
+      .article-link {{ transition: none; }}
+      .chevron, .vocab-chevron {{ transition: none; }}
+    }}
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased">
@@ -498,10 +565,10 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
       </div>
       <div class="flex flex-wrap gap-2 mb-6">{hero_badges}</div>
       <div class="grid grid-cols-4 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">{article_count}</p><p class="text-xs text-slate-500 mt-0.5">Articles</p></div>
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">Categories</p></div>
-        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">Summaries</p></div>
-        <div class="text-center py-3"><p class="text-lg font-bold text-indigo-300">EN/JP</p><p class="text-xs text-slate-500 mt-0.5">Bilingual</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">{article_count}</p><p class="text-xs text-slate-500 mt-0.5">記事数</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">カテゴリ</p></div>
+        <div class="text-center py-3 border-r border-white/10"><p class="text-lg font-bold">4</p><p class="text-xs text-slate-500 mt-0.5">要約</p></div>
+        <div class="text-center py-3"><p class="text-lg font-bold text-indigo-300">EN/JP</p><p class="text-xs text-slate-500 mt-0.5">バイリンガル</p></div>
       </div>
     </div>
   </header>
@@ -516,13 +583,35 @@ def generate_html(news_data: dict | None, date_str: str) -> str:
   </footer>
 
   <script>
+    // ナビタブのアクティブ状態をセクションの交差に連動させる
+    // アクティブ時: そのカテゴリのカラーで下線＋テキスト着色（color は data-color 属性で取得）
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('section[id]');
+
+    function setActiveTab(sectionId) {{
+      tabs.forEach(tab => {{
+        const isActive = tab.dataset.section === sectionId;
+        const color = tab.dataset.color;
+        // リセット
+        tab.classList.remove('font-semibold', 'border-transparent', 'text-slate-500');
+        tab.classList.remove(
+          `text-blue-600`, `border-blue-500`,
+          `text-purple-600`, `border-purple-500`,
+          `text-emerald-600`, `border-emerald-500`,
+          `text-amber-600`, `border-amber-500`
+        );
+        if (isActive) {{
+          tab.classList.add('font-semibold', `text-${{color}}-600`, `border-${{color}}-500`);
+        }} else {{
+          tab.classList.add('border-transparent', 'text-slate-500');
+        }}
+      }});
+    }}
+
     const observer = new IntersectionObserver(
       entries => {{
         entries.forEach(e => {{
-          if (e.isIntersecting)
-            tabs.forEach(t => t.classList.toggle('font-semibold', t.dataset.section === e.target.id));
+          if (e.isIntersecting) setActiveTab(e.target.id);
         }});
       }},
       {{ rootMargin: '-48px 0px -60% 0px', threshold: 0 }}
@@ -543,12 +632,16 @@ def save_html(html_content: str) -> None:
 # ── LINE送信 ───────────────────────────────────────────────────────────────────
 
 def build_line_message(date_str: str) -> str:
+    # name_short と同じ短縮名を使用してカテゴリ表記を統一
+    names = " ／ ".join(
+        f"{cfg['emoji']} {cfg['name_short']}" for cfg in CATEGORIES_CONFIG
+    )
     return (
         f"【Daily Intelligence】\n"
         f"{date_str}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📰 今日のレポートが届きました\n\n"
-        f"🤖 AI ／ 💻 Tech ／ 🌍 World ／ ✈️ Flights\n\n"
+        f"{names}\n\n"
         f"🔗 フルレポートを読む：\n"
         f"{GITHUB_PAGES_URL}"
     )
@@ -577,24 +670,36 @@ def main() -> None:
         f"{now.strftime('%H:%M')}"
     )
 
+    # ── フェーズ1: ニュース取得（カテゴリ単位で失敗を吸収）──
     news_data: dict | None = None
     try:
         news_data = fetch_news(client)
     except Exception as e:
         print(f"ERROR [fetch_news]: {safe_error(e)}")
 
+    # ── フェーズ2: HTML生成・保存 ──────────────────────────
+    html_saved = False
     try:
         html_content = generate_html(news_data, date_str)
         save_html(html_content)
+        html_saved = True
     except Exception as e:
-        print(f"ERROR [generate_html]: {safe_error(e)}")
+        print(f"ERROR [generate_html/save_html]: {safe_error(e)}")
 
+    # HTMLが保存できなかった場合は exit(1) でプッシュをスキップ
+    # （壊れたファイルをコミットしないため）
+    if not html_saved:
+        print("FATAL: HTML を保存できなかったためプッシュをスキップします")
+        sys.exit(1)
+
+    # ── フェーズ3: LINE通知 ────────────────────────────────
+    # LINE失敗は exit(1) しない。プッシュ（GitHub Pages更新）を優先する。
     try:
         send_to_line([build_line_message(date_str)])
         print("SUCCESS: LINE 送信完了")
     except Exception as e:
         print(f"ERROR [send_to_line]: {safe_error(e)}")
-        sys.exit(1)
+        print("WARNING: LINE 通知は失敗しましたが、HTML は GitHub Pages に公開されます")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,9 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
 
       - name: Commit and push HTML report
+        # LINE通知の失敗に関わらずプッシュを実行する。
+        # python main.py が exit(1) するのは HTML 保存失敗時のみなので、
+        # 保存成功 → LINE失敗 のケースでは exit(0) となりこのステップが実行される。
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
