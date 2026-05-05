@@ -82,8 +82,9 @@ CATEGORIES_CONFIG = [
         "gradient": "from-amber-500 to-orange-500",
         "color": "amber",
         "header_text": "amber-100",
-        "search_ja": "航空券セール・旅行・新路線・LCC",
-        "sources_ja": "トラベルメディア、ANA公式、JAL公式、スカイスキャナー日本版、たびレコ、トラベルボイス",
+        "search_ja": "航空券セール・新路線・マイル・旅行",
+        "primary_source": "TRAICY（https://www.traicy.com/）",
+        "sources_ja": "TRAICY (traicy.com)、トラベルボイス、ANA公式、JAL公式、マイナビトラベル",
         "disclaimer": "※情報の正確性は各社公式サイトでご確認ください",
     },
 ]
@@ -96,12 +97,16 @@ def _build_search_instructions(cfg: dict) -> str:
         f"\n- Japanese summary must end with the sentence: 「{cfg['disclaimer']}」"
         if cfg["disclaimer"] else ""
     )
+    primary_source_line = (
+        f"\n- PRIMARY source to search first: {cfg['primary_source']}"
+        if cfg.get("primary_source") else ""
+    )
     return f"""\
 You are a Japanese news analyst. Search ONLY Japanese news websites and report \
 today's latest news about {cfg['search_ja']} ({cfg['name']}).
 
 Rules:
-- Sources MUST be Japanese websites only. Good examples: {cfg['sources_ja']}
+- Sources MUST be Japanese websites only. Good examples: {cfg['sources_ja']}{primary_source_line}
 - Find between 1 and 3 articles (use however many genuinely exist today; max 3)
 - For each article: full Japanese or English title as published, source name, and full URL
 - Write an English summary of approximately 200 words covering the articles found
