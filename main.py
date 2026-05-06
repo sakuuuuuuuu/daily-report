@@ -49,6 +49,11 @@ GITHUB_PAGES_URL = "https://sakuuuuuuuu.github.io/daily-report/"
 HTML_OUTPUT_PATH = Path("docs/index.html")
 MAX_CHARS = 4000
 
+# 語彙（vocabulary）— 件数はプロンプトとコードで同じ定数を参照し、超過は切り詰め、不足はリトライする。
+VOCAB_MIN = 4
+VOCAB_MAX = 10
+VOCAB_GENERATION_ATTEMPTS = 3  # 初回 + リトライ2回（下限未満・JSON不正時）
+
 CATEGORIES_CONFIG = [
     {
         "id": "ai",
@@ -242,6 +247,59 @@ def fetch_category_rss(cfg: dict) -> list[dict]:
     return unique[:3]  # 最大3件
 
 
+def _sanitize_vocabulary(raw: object) -> list[dict]:
+    """AI が返した vocabulary を検証し、word が空でない項目だけを正規化して返す。"""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        word = str(item.get("word", "")).strip()
+        if not word:
+            continue
+        out.append({
+            "word":       word,
+            "pos":        str(item.get("pos", "")).strip(),
+            "meaning_ja": str(item.get("meaning_ja", "")).strip(),
+            "example":    str(item.get("example", "")).strip(),
+        })
+    return out
+
+
+def _apply_vocab_clip(vocab: list[dict], category_id: str) -> list[dict]:
+    """上限を超える語彙を切り詰げる（難易度順の先頭を保持する想定）。"""
+    if len(vocab) <= VOCAB_MAX:
+        return vocab
+    print(
+        f"  [{category_id}] [INFO] vocabulary clipped: {len(vocab)} -> {VOCAB_MAX} "
+        f"(max {VOCAB_MAX})"
+    )
+    return vocab[:VOCAB_MAX]
+
+
+def _vocabulary_retry_instruction(current_count: int) -> str:
+    """下限未満のときの追いプロンプト。件数は定数と一致させる。"""
+    return (
+        f"You returned {current_count} vocabulary item(s) after filtering empty entries. "
+        f"The vocabulary array MUST contain between {VOCAB_MIN} and {VOCAB_MAX} items. "
+        "Each word must be challenging for TOEIC 650+ learners (CEFR B2–C1): "
+        "do NOT pad with easy or generic words just to increase the count. "
+        "Draw words from the articles and summary_en; prefer precise academic, technical, "
+        "or formal vocabulary. "
+        "Return the COMPLETE JSON object again (summary_en, summary_ja, vocabulary) "
+        "with the vocabulary array corrected."
+    )
+
+
+def _json_retry_instruction() -> str:
+    return (
+        "Your previous reply was not valid JSON. "
+        "Return ONLY one valid JSON object as specified in the system message, "
+        "with no markdown fences or extra text."
+    )
+
+
 # ── OpenAI 要約 ────────────────────────────────────────────────────────────────
 
 def summarize_category(client: OpenAI, articles: list[dict], cfg: dict) -> dict:
@@ -249,6 +307,10 @@ def summarize_category(client: OpenAI, articles: list[dict], cfg: dict) -> dict:
     RSS から取得した記事テキストを OpenAI で要約する。
     web_search を使わず chat.completions のみ → トークン代のみ（月 ~$0.15 相当）。
     例外は呼び出し元（fetch_news）でカテゴリ単位にハンドリングする。
+
+    vocabulary は VOCAB_MIN〜VOCAB_MAX 件をプロンプトとコードで揃え、
+    超過は切り詰め、不足・JSON 不正は最大 VOCAB_GENERATION_ATTEMPTS 回までリトライする。
+    それでも下限未満のときは警告ログを出して返す（件数より難易度を優先する設計）。
     """
     if not articles:
         return {
@@ -262,6 +324,7 @@ def summarize_category(client: OpenAI, articles: list[dict], cfg: dict) -> dict:
         if cfg.get("disclaimer") else ""
     )
 
+    vmin, vmax = VOCAB_MIN, VOCAB_MAX
     system_prompt = f"""\
 You are a bilingual Japanese/English news analyst.
 Summarize the {cfg['name']} ({cfg['summary_focus']}) articles below.{disclaimer_note}
@@ -271,29 +334,90 @@ Return ONLY a valid JSON object (no markdown fences, no other text):
   "summary_en": "Approximately 200-word English summary covering all articles",
   "summary_ja": "Natural Japanese translation of summary_en (~200字)",
   "vocabulary": [
-    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
+    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "Natural English sentence (max 20 words) using this word in context."}},
     {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味", "example": "..."}}
   ]
 }}
-vocabulary: From the articles and summary_en, pick the top 10 most challenging English words for TOEIC 650+ learners (CEFR B2–C1 level). Rank them by difficulty (hardest first). Avoid common everyday words; prefer precise academic, technical, or formal vocabulary. Each "example" must be a natural English sentence (max 20 words) that shows the word in context."""
+vocabulary rules:
+- Include between {vmin} and {vmax} English words taken from the articles and summary_en.
+- Target TOEIC 650+ difficulty (CEFR B2–C1): avoid common everyday words; prefer precise academic, technical, or formal vocabulary.
+- Rank by difficulty (hardest first). At most {vmax} items.
+- Quality over quantity: do NOT pad with easier words just to reach {vmin}; choose genuinely challenging words only.
+- Each "example" must be a natural English sentence (max 20 words) showing the word in context."""
 
     articles_text = "\n\n".join(
         f"[{i}] {art['title']}\nSource: {art['source']}\nURL: {art['url']}\n{art['description']}"
         for i, art in enumerate(articles, 1)
     )
 
-    resp = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": articles_text},
-        ],
-        max_tokens=2000,
-        timeout=60,
-    )
+    cid = cfg["id"]
+    messages: list[dict] = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": articles_text},
+    ]
 
-    return json.loads(resp.choices[0].message.content)
+    last_data: dict | None = None
+    last_raw: str | None = None
+
+    for attempt in range(1, VOCAB_GENERATION_ATTEMPTS + 1):
+        resp = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            response_format={"type": "json_object"},
+            messages=messages,
+            max_tokens=2000,
+            timeout=60,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        last_raw = raw
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"  [{cid}] [WARN] invalid JSON (attempt {attempt}/{VOCAB_GENERATION_ATTEMPTS}): {e}")
+            if attempt >= VOCAB_GENERATION_ATTEMPTS:
+                raise
+            messages.append({"role": "assistant", "content": raw})
+            messages.append({"role": "user", "content": _json_retry_instruction()})
+            continue
+
+        if not isinstance(data, dict):
+            print(f"  [{cid}] [WARN] JSON root is not an object (attempt {attempt})")
+            if attempt >= VOCAB_GENERATION_ATTEMPTS:
+                raise TypeError("OpenAI returned JSON that is not an object")
+            messages.append({"role": "assistant", "content": raw})
+            messages.append({"role": "user", "content": _json_retry_instruction()})
+            continue
+
+        vocab = _sanitize_vocabulary(data.get("vocabulary"))
+        vocab = _apply_vocab_clip(vocab, cid)
+        data["vocabulary"] = vocab
+        last_data = data
+
+        n = len(vocab)
+        if VOCAB_MIN <= n <= VOCAB_MAX:
+            return data
+
+        if n < VOCAB_MIN:
+            print(
+                f"  [{cid}] [WARN] vocabulary count {n} < {VOCAB_MIN} "
+                f"(attempt {attempt}/{VOCAB_GENERATION_ATTEMPTS})"
+            )
+            if attempt >= VOCAB_GENERATION_ATTEMPTS:
+                print(
+                    f"  [{cid}] [WARN] vocabulary still below minimum after "
+                    f"{VOCAB_GENERATION_ATTEMPTS} attempts; publishing {n} item(s)"
+                )
+                return data
+            messages.append({"role": "assistant", "content": raw})
+            messages.append({"role": "user", "content": _vocabulary_retry_instruction(n)})
+            continue
+
+    # 上のループは必ず return する想定（件数・JSON いずれかで確定）
+    if last_data is not None:
+        return last_data
+    raise RuntimeError(
+        f"[{cid}] summarize_category: no usable response (last_raw={last_raw!r})"
+    )
 
 
 # ── ニュース取得（統合） ────────────────────────────────────────────────────────
