@@ -2,7 +2,7 @@ name: Daily Report
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # UTC 22:00 = JST 07:00
+    - cron: '45 21 * * *'  # UTC 21:45 = JST 06:45
   workflow_dispatch:       # 手動テスト用
 
 permissions: {}            # デフォルト無権限（最小権限の原則）

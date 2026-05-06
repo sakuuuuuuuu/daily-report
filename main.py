@@ -272,12 +272,10 @@ Return ONLY a valid JSON object (no markdown fences, no other text):
   "summary_ja": "Natural Japanese translation of summary_en (~200字)",
   "vocabulary": [
     {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
-    {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
-    {{"word": "English word", "pos": "adj.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}},
-    {{"word": "English word", "pos": "n.", "meaning_ja": "日本語の意味", "example": "A short sentence using this word from the article context."}}
+    {{"word": "English word", "pos": "v.", "meaning_ja": "日本語の意味", "example": "..."}}
   ]
 }}
-vocabulary: 4 TOEIC B1+ level English words chosen from summary_en. Each "example" must be a natural English sentence (max 20 words) that shows the word in context."""
+vocabulary: From the articles and summary_en, pick the top 10 most challenging English words for TOEIC 650+ learners (CEFR B2–C1 level). Rank them by difficulty (hardest first). Avoid common everyday words; prefer precise academic, technical, or formal vocabulary. Each "example" must be a natural English sentence (max 20 words) that shows the word in context."""
 
     articles_text = "\n\n".join(
         f"[{i}] {art['title']}\nSource: {art['source']}\nURL: {art['url']}\n{art['description']}"
@@ -291,7 +289,7 @@ vocabulary: 4 TOEIC B1+ level English words chosen from summary_en. Each "exampl
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": articles_text},
         ],
-        max_tokens=1400,
+        max_tokens=2000,
         timeout=60,
     )
 
